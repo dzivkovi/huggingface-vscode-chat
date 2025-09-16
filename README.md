@@ -35,6 +35,8 @@ For secure, on-premise environments where data cannot leave your network:
 3. Select your local model from the GitHub Copilot Chat model picker
 4. **No API keys required, all processing stays on your infrastructure**
 
+![Air-Gapped vLLM Inference](./assets/air-gapped-vLLM-inference.png)
+
 ## Cloud Deployment (Hugging Face)
 1. **Install the extension**: [📦 Download VSIX](./releases/huggingface-vscode-chat-latest.vsix) or [🛍️ Marketplace](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat)
 2. Open VS Code's chat interface.
