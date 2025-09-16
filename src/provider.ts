@@ -12,6 +12,7 @@ import {
 import type { HFModelItem, HFModelsResponse } from "./types";
 
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
+import { logger } from "./logger";
 
 const BASE_URL = "https://router.huggingface.co/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
@@ -50,11 +51,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private _emittedTextToolCallKeys = new Set<string>();
 	private _emittedTextToolCallIds = new Set<string>();
 
+	// Optional TGI endpoint from VS Code settings
+	private _tgiEndpoint: string | undefined;
+
 	/**
 	 * Create a provider using the given secret storage for the API key.
 	 * @param secrets VS Code secret storage.
 	 */
-	constructor(private readonly secrets: vscode.SecretStorage, private readonly userAgent: string) {}
+	constructor(private readonly secrets: vscode.SecretStorage, private readonly userAgent: string) {
+		// Load TGI endpoint from VS Code settings
+		const config = vscode.workspace.getConfiguration('huggingface');
+		const endpoint = config.get<string>('customTGIEndpoint');
+		// Trim whitespace to avoid URL parsing issues
+		this._tgiEndpoint = endpoint?.trim();
+		if (this._tgiEndpoint) {
+			logger.info(`TGI endpoint configured: ${this._tgiEndpoint}`);
+		}
+	}
 
 	/** Roughly estimate tokens for VS Code chat messages (text only) */
 	private estimateMessagesTokens(msgs: readonly vscode.LanguageModelChatMessage[]): number {
@@ -90,14 +103,58 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		options: { silent: boolean },
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
+		const infos: LanguageModelChatInformation[] = [];
+
+		// Add TGI models if configured
+		if (this._tgiEndpoint) {
+			// Fetch available models from TGI endpoint
+			try {
+				const tgiModels = await this.fetchTGIModels(this._tgiEndpoint);
+				for (const model of tgiModels) {
+					const hostname = new URL(this._tgiEndpoint).hostname;
+					infos.push({
+						id: `tgi|${this._tgiEndpoint}|${model}`,
+						name: `${model} @ ${hostname}`,
+						tooltip: `TGI model ${model} at ${this._tgiEndpoint}`,
+						family: "huggingface",
+						version: "1.0.0",
+						maxInputTokens: 4096,
+						maxOutputTokens: 2048,
+						capabilities: {
+							toolCalling: false,
+							imageInput: false,
+						},
+					} satisfies LanguageModelChatInformation);
+				}
+			} catch (e) {
+				// If we can't fetch models, add a generic TGI entry
+				logger.error(" Failed to fetch TGI models", e);
+				const hostname = this._tgiEndpoint.replace(/^https?:\/\//, '').split('/')[0];
+				infos.push({
+					id: `tgi|${this._tgiEndpoint}|default`,
+					name: `TGI @ ${hostname}`,
+					tooltip: `TGI server at ${this._tgiEndpoint}`,
+					family: "huggingface",
+					version: "1.0.0",
+					maxInputTokens: 4096,
+					maxOutputTokens: 2048,
+					capabilities: {
+						toolCalling: false,
+						imageInput: false,
+					},
+				} satisfies LanguageModelChatInformation);
+			}
+		}
+
+		// Fetch HF Router models if API key is available
 		const apiKey = await this.ensureApiKey(options.silent);
 		if (!apiKey) {
-			return [];
+			return infos; // Return TGI model only if no API key
 		}
 
 		const { models } = await this.fetchModels(apiKey);
 
-		const infos: LanguageModelChatInformation[] = models.flatMap((m) => {
+		const hfInfos: LanguageModelChatInformation[] = models.flatMap((m) => {
 			const providers = m?.providers ?? [];
 			const modalities = m.architecture?.input_modalities ?? [];
 			const vision = Array.isArray(modalities) && modalities.includes("image");
@@ -153,6 +210,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			modelMaxPromptTokens: info.maxInputTokens + info.maxOutputTokens,
 		}));
 
+		// Add HF Router models to the list
+		infos.push(...hfInfos);
+
 		return infos;
 	}
 
@@ -161,6 +221,79 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		_token: CancellationToken
 	): Promise<LanguageModelChatInformation[]> {
 		return this.prepareLanguageModelChatInformation({ silent: options.silent ?? false }, _token);
+	}
+
+	/**
+	 * Check TGI server health.
+	 * @param endpoint The TGI server endpoint.
+	 * @returns Health check result with status and reason.
+	 */
+	private async checkTGIHealth(endpoint: string): Promise<{ healthy: boolean; reason?: string }> {
+		try {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for health check
+
+			const healthUrl = endpoint.endsWith('/') ? `${endpoint}health` : `${endpoint}/health`;
+			const response = await fetch(healthUrl, {
+				method: "GET",
+				headers: { "User-Agent": this.userAgent },
+				signal: controller.signal,
+			});
+
+			clearTimeout(timeoutId);
+
+			if (response.ok) {
+				return { healthy: true };
+			} else {
+				return { healthy: false, reason: `Health check returned ${response.status}` };
+			}
+		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				return { healthy: false, reason: "Health check timed out" };
+			}
+			return {
+				healthy: false,
+				reason: error instanceof Error ? error.message : "Unknown error"
+			};
+		}
+	}
+
+	/**
+	 * Fetch available models from TGI server.
+	 * @param endpoint The TGI server endpoint.
+	 */
+	private async fetchTGIModels(endpoint: string): Promise<string[]> {
+		try {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+			const response = await fetch(`${endpoint}/v1/models`, {
+				method: "GET",
+				headers: { "User-Agent": this.userAgent },
+				signal: controller.signal,
+			});
+
+			clearTimeout(timeoutId);
+
+			if (!response.ok) {
+				logger.warn(`Failed to fetch TGI models: ${response.status}`);
+				return [];
+			}
+
+			const data = await response.json() as { data?: Array<{ id?: string }> };
+			// TGI returns {"object": "list", "data": [{"id": "model-name", ...}]}
+			if (data?.data && Array.isArray(data.data)) {
+				return data.data.map((m) => m.id || "unknown");
+			}
+			return [];
+		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				logger.warn("Timeout fetching TGI models");
+			} else {
+				logger.warn("Error fetching TGI models", error);
+			}
+			return [];
+		}
 	}
 
 	/**
@@ -180,12 +313,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					try {
 						text = await resp.text();
 					} catch (error) {
-						console.error("[Hugging Face Model Provider] Failed to read response text", error);
+						logger.error(" Failed to read response text", error);
 					}
 					const err = new Error(
 						`Failed to fetch Hugging Face models: ${resp.status} ${resp.statusText}${text ? `\n${text}` : ""}`
 					);
-					console.error("[Hugging Face Model Provider] Failed to fetch Hugging Face models", err);
+					logger.error(" Failed to fetch Hugging Face models", err);
 					throw err;
 				}
 				const parsed = (await resp.json()) as HFModelsResponse;
@@ -196,7 +329,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				const models = await modelsList;
 				return { models };
 			} catch (err) {
-				console.error("[Hugging Face Model Provider] Failed to fetch Hugging Face models", err);
+				logger.error(" Failed to fetch Hugging Face models", err);
 				throw err;
 			}
 		}
@@ -235,7 +368,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				try {
 					progress.report(part);
 				} catch (e) {
-					console.error("[Hugging Face Model Provider] Progress.report failed", {
+					logger.error(" Progress.report failed", {
 						modelId: model.id,
 						error: e instanceof Error ? { name: e.name, message: e.message } : String(e),
 					});
@@ -243,9 +376,38 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			},
 		};
 		try {
-			const apiKey = await this.ensureApiKey(true);
-			if (!apiKey) {
-				throw new Error("Hugging Face API key not found");
+			// Check if this is a TGI model request
+			let apiKey: string | undefined;
+			let baseUrl = BASE_URL;
+			let isTGI = false;
+
+			if (model.id.startsWith('tgi|')) {
+				// TGI model - extract endpoint and model name from ID
+				// Format: tgi|endpoint|modelname
+				const parts = model.id.replace('tgi|', '').split('|');
+				baseUrl = parts[0].trim();
+
+				// Validate TGI endpoint URL
+				try {
+					const url = new URL(baseUrl);
+					if (!url.protocol.startsWith('http')) {
+						throw new Error(`Invalid protocol: ${url.protocol}`);
+					}
+				} catch (urlError) {
+					logger.error("Invalid TGI endpoint URL", { endpoint: baseUrl, error: urlError });
+					throw new Error(`Invalid TGI endpoint URL: ${baseUrl}`);
+				}
+
+				apiKey = "dummy"; // TGI doesn't require API key
+				isTGI = true;
+				logger.info(`Processing TGI request to ${baseUrl}`, { modelId: model.id });
+			} else {
+				// HF Router model - need API key
+				apiKey = await this.ensureApiKey(true);
+				if (!apiKey) {
+					throw new Error("Hugging Face API key not found");
+				}
+				logger.debug(`Processing HF Router request`, { modelId: model.id });
 			}
 
             const openaiMessages = convertMessages(messages);
@@ -262,7 +424,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
             const toolTokenCount = this.estimateToolTokens(toolConfig.tools);
             const tokenLimit = Math.max(1, model.maxInputTokens);
             if (inputTokenCount + toolTokenCount > tokenLimit) {
-                console.error("[Hugging Face Model Provider] Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
+                logger.error(" Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
                 throw new Error("Message exceeds token limit.");
             }
 
@@ -294,30 +456,184 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (toolConfig.tool_choice) {
 				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
 			}
-			const response = await fetch(`${BASE_URL}/chat/completions`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    "Content-Type": "application/json",
-					"User-Agent": this.userAgent,
-                },
-                body: JSON.stringify(requestBody),
-            });
+			// For TGI, use completions endpoint (chat endpoint has template issues)
+			// Ensure proper URL construction
+			const endpoint = model.id.startsWith('tgi|')
+				? baseUrl.endsWith('/') ? `${baseUrl}v1/completions` : `${baseUrl}/v1/completions`
+				: `${baseUrl}/chat/completions`;
+
+			// Adjust request for TGI completions endpoint
+			if (model.id.startsWith('tgi|')) {
+				// Convert to completions format for TGI
+				const lastMessage = openaiMessages[openaiMessages.length - 1];
+				const tgiRequestBody = requestBody as Record<string, unknown>;
+				tgiRequestBody.prompt = lastMessage.content || "";
+				// Extract model name from ID (format: tgi|endpoint|modelname)
+				const modelName = model.id.split('|')[2] || "bigcode/starcoder2-3b";
+				tgiRequestBody.model = modelName === "default" ? "bigcode/starcoder2-3b" : modelName;
+				delete tgiRequestBody.messages;
+				logger.debug(`TGI request prepared`, {
+					endpoint,
+					model: (requestBody as Record<string, unknown>).model,
+					promptLength: ((requestBody as Record<string, unknown>).prompt as string).length,
+					maxTokens: requestBody.max_tokens
+				});
+			} else {
+				logger.debug(`HF Router request prepared`, {
+					endpoint,
+					model: requestBody.model,
+					messageCount: openaiMessages.length,
+					maxTokens: requestBody.max_tokens
+				});
+			}
+
+			// For TGI, optionally check server health first
+			if (isTGI) {
+				const healthCheckResult = await this.checkTGIHealth(baseUrl);
+				if (!healthCheckResult.healthy) {
+					logger.error("TGI server health check failed", {
+						endpoint: baseUrl,
+						reason: healthCheckResult.reason
+					});
+					throw new Error(`TGI server is not healthy: ${healthCheckResult.reason}`);
+				}
+			}
+
+			let response: Response;
+			let retryCount = 0;
+			const maxRetries = isTGI ? 2 : 0; // Retry TGI requests up to 2 times
+
+			while (true) {
+				try {
+					const controller = new AbortController();
+					const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+					response = await fetch(endpoint, {
+						method: "POST",
+						headers: {
+							Authorization: `Bearer ${apiKey}`,
+							"Content-Type": "application/json",
+							"User-Agent": this.userAgent,
+						},
+						body: JSON.stringify(requestBody),
+						signal: controller.signal,
+					});
+
+					clearTimeout(timeoutId);
+					break; // Success, exit retry loop
+
+				} catch (fetchError) {
+					if (retryCount < maxRetries) {
+						retryCount++;
+						const delay = retryCount * 1000; // Exponential backoff
+						logger.warn(`Request failed, retrying in ${delay}ms...`, {
+							retry: retryCount,
+							maxRetries,
+							error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+						});
+						await new Promise(resolve => setTimeout(resolve, delay));
+						continue;
+					}
+
+					// Max retries exceeded or non-retryable error
+					logger.error("Failed to send request after retries", {
+						endpoint,
+						retries: retryCount,
+						error: fetchError instanceof Error ? {
+							message: fetchError.message,
+							name: fetchError.name,
+							stack: fetchError.stack
+						} : String(fetchError)
+					});
+
+					if (isTGI) {
+						throw new Error(
+							`Failed to connect to TGI server at ${baseUrl}. ` +
+							`Please check:\n` +
+							`1. The TGI server is running (docker ps)\n` +
+							`2. The endpoint URL is correct: ${baseUrl}\n` +
+							`3. No firewall is blocking the connection\n` +
+							`Error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`
+						);
+					} else {
+						throw fetchError;
+					}
+				}
+			}
+
+			logger.debug(`Request sent to ${endpoint}`);
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error("[Hugging Face Model Provider] HF API error response", errorText);
-				throw new Error(
-					`Hugging Face API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
-				);
+				logger.error("API error response", {
+					status: response.status,
+					statusText: response.statusText,
+					errorText,
+					endpoint,
+					modelId: model.id
+				});
+
+				// Provide more specific error messages for common TGI issues
+				if (isTGI) {
+					if (response.status === 404) {
+						throw new Error(
+							`TGI endpoint not found (404). Please check:\n` +
+							`1. The endpoint URL is correct: ${baseUrl}\n` +
+							`2. TGI is configured to serve at /v1/completions`
+						);
+					} else if (response.status === 503) {
+						throw new Error(
+							`TGI server unavailable (503). The server may be:\n` +
+							`1. Still loading the model\n` +
+							`2. Out of memory\n` +
+							`3. Crashed - check Docker logs with: docker logs <container>`
+						);
+					} else if (response.status === 500) {
+						throw new Error(
+							`TGI server error (500). Common causes:\n` +
+							`1. Model quantization issues\n` +
+							`2. Input exceeds context length\n` +
+							`3. Memory allocation failure\n` +
+							`Check Docker logs: docker logs <container>\n` +
+							`Error details: ${errorText ? errorText.substring(0, 200) : 'none'}`
+						);
+					} else if (response.status === 422) {
+						throw new Error(
+							`TGI request validation failed (422). The request format may be incompatible.\n` +
+							`Error: ${errorText ? errorText.substring(0, 200) : 'none'}`
+						);
+					} else {
+						throw new Error(
+							`TGI server error: ${response.status} ${response.statusText}\n` +
+							`Error: ${errorText ? errorText.substring(0, 200) : 'none'}`
+						);
+					}
+				} else {
+					throw new Error(
+						`Hugging Face API error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`
+					);
+				}
 			}
 
 			if (!response.body) {
-				throw new Error("No response body from Hugging Face API");
+				logger.error("No response body from API", { endpoint, modelId: model.id });
+				if (isTGI) {
+					throw new Error(
+						`No response body from TGI server. This may indicate:\n` +
+						`1. The server crashed during processing\n` +
+						`2. Network connection was interrupted\n` +
+						`Check server status with: curl ${baseUrl}/health`
+					);
+				} else {
+					throw new Error("No response body from Hugging Face API");
+				}
 			}
-			await this.processStreamingResponse(response.body, trackingProgress, token);
+
+			logger.debug("Processing streaming response...");
+			await this.processStreamingResponse(response.body, trackingProgress, token, isTGI ? baseUrl : undefined);
+			logger.debug("Streaming response completed successfully");
 		} catch (err) {
-			console.error("[Hugging Face Model Provider] Chat request failed", {
+			logger.error("Chat request failed", {
 				modelId: model.id,
 				messageCount: messages.length,
 				error: err instanceof Error ? { name: err.name, message: err.message } : String(err),
@@ -328,13 +644,13 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 	/**
 	 * Returns the number of tokens for a given text using the model specific tokenizer logic
-	 * @param model The language model to use
+	 * @param _model The language model to use (unused, estimation is character-based)
 	 * @param text The text to count tokens for
 	 * @param token A cancellation token for the request
 	 * @returns A promise that resolves to the number of tokens
 	 */
 	async provideTokenCount(
-		model: LanguageModelChatInformation,
+		_model: LanguageModelChatInformation,
 		text: string | LanguageModelChatMessage,
 		_token: CancellationToken
 	): Promise<number> {
@@ -382,15 +698,46 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	        responseBody: ReadableStream<Uint8Array>,
 	        progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 	        token: vscode.CancellationToken,
+		tgiEndpoint?: string,
 	    ): Promise<void> {
         const reader = responseBody.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
 
+			let responseStarted = false;
+			let lastDataTime = Date.now();
+			const timeout = 60000; // 60 second timeout for no data
+
 			try {
 				while (!token.isCancellationRequested) {
-					const { done, value } = await reader.read();
-                if (done) { break; }
+					// Check for timeout
+					if (responseStarted && Date.now() - lastDataTime > timeout) {
+						logger.error("Stream timeout - no data received for 60 seconds");
+						throw new Error("Response timeout: No data received from server");
+					}
+
+					let done, value;
+					try {
+						const result = await reader.read();
+						done = result.done;
+						value = result.value;
+					} catch (readError) {
+						logger.error("Stream read error - connection may have dropped", {
+							error: readError instanceof Error ? readError.message : String(readError)
+						});
+						throw new Error("Connection lost while reading response stream");
+					}
+
+                if (done) {
+					logger.debug("Stream ended normally");
+					break;
+				}
+
+				if (!responseStarted) {
+					responseStarted = true;
+					logger.debug("Stream started - receiving data");
+				}
+				lastDataTime = Date.now();
 
 					buffer += decoder.decode(value, { stream: true });
 					const lines = buffer.split("\n");
@@ -406,18 +753,69 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
                         await this.flushToolCallBuffers(progress, /*throwOnInvalid*/ false);
                         // Flush any in-progress text-embedded tool call (silent if incomplete)
                         await this.flushActiveTextToolCall(progress);
+                        logger.debug(`Received [DONE] signal. Has emitted text: ${this._hasEmittedAssistantText}`);
+                        if (!this._hasEmittedAssistantText) {
+                            logger.warn("Stream completed but no text was emitted - possible server error");
+                        }
                         continue;
                     }
 
 						try {
 							const parsed = JSON.parse(data);
+							// Log first few deltas for debugging
+							if (!this._hasEmittedAssistantText || Math.random() < 0.05) { // Log first delta and 5% of others
+								logger.debug(`SSE delta received`, {
+									data: JSON.stringify(parsed).substring(0, 300)
+								});
+							}
                         await this.processDelta(parsed, progress);
-                    } catch {
-                        // Silently ignore malformed SSE lines temporarily
+                    } catch (e) {
+                        // Log malformed SSE lines for debugging
+                        logger.warn("Failed to parse SSE line", {
+                            data: data.substring(0, 200),
+                            error: e instanceof Error ? e.message : String(e)
+                        });
                     }
                 }
             }
+		} catch (streamError) {
+			logger.error("Error during stream processing", {
+				error: streamError instanceof Error ? {
+					message: streamError.message,
+					stack: streamError.stack
+				} : String(streamError)
+			});
+			// Emit error message to user if no content was sent
+			if (!this._hasEmittedAssistantText) {
+				try {
+					progress.report(new vscode.LanguageModelTextPart("I encountered an error while processing the response. Please check the logs for details."));
+					logger.warn("Emitted error message to user due to stream error with no prior content");
+				} catch (reportError) {
+					logger.error("Failed to report error message to user", reportError);
+				}
+			}
+			throw streamError;
         } finally {
+			// Check if stream ended without any content
+			if (!this._hasEmittedAssistantText && !token.isCancellationRequested) {
+				logger.error("Stream completed but no content was emitted to user");
+				try {
+					if (tgiEndpoint) {
+						progress.report(new vscode.LanguageModelTextPart(
+							"The TGI server returned an empty response. Common causes:\n" +
+							"1. Model crashed during generation (check Docker logs)\n" +
+							"2. Input prompt exceeded context length\n" +
+							"3. Out of GPU memory\n\n" +
+							"Run 'docker logs <container>' to see the error details."
+						));
+					} else {
+						progress.report(new vscode.LanguageModelTextPart("The server returned an empty response."));
+					}
+					logger.warn("Emitted empty response warning to user");
+				} catch (reportError) {
+					logger.error("Failed to report empty response warning", reportError);
+				}
+			}
             reader.releaseLock();
             // Clean up any leftover tool call state
             this._toolCallBuffers.clear();
@@ -474,15 +872,28 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
             } catch {
                 // ignore errors here temporarily
             }
-            if (deltaObj?.content) {
-                const content = String(deltaObj.content);
+
+            // Handle both HF Router format (delta.content) and TGI format (text)
+            const textContent = deltaObj?.content || choice.text;
+            if (textContent) {
+                const content = String(textContent);
+                logger.debug(`Processing text content: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
                 const res = this.processTextContent(content, progress);
                 if (res.emittedText) {
                     this._hasEmittedAssistantText = true;
+                    logger.debug(`Emitted text content, total emitted so far: ${this._hasEmittedAssistantText}`);
                 }
                 if (res.emittedAny) {
                     emitted = true;
                 }
+            } else {
+                // Log when we receive a delta with no text content
+                logger.debug(`Received delta with no text content`, {
+                    hasChoice: !!choice,
+                    hasDelta: !!deltaObj,
+                    choiceKeys: choice ? Object.keys(choice) : [],
+                    deltaKeys: deltaObj ? Object.keys(deltaObj) : []
+                });
             }
 
 			if (deltaObj?.tool_calls) {
@@ -748,7 +1159,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
             const parsed = tryParseJSONObject(buf.args);
             if (!parsed.ok) {
                 if (throwOnInvalid) {
-                    console.error("[Hugging Face Model Provider] Invalid JSON for tool call", { idx, snippet: (buf.args || "").slice(0, 200) });
+                    logger.error(" Invalid JSON for tool call", { idx, snippet: (buf.args || "").slice(0, 200) });
                     throw new Error("Invalid JSON for tool call");
                 }
                 // When not throwing (e.g. on [DONE]), drop silently to reduce noise
