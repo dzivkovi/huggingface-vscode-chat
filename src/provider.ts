@@ -289,7 +289,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
 
-			const response = await fetch(`${endpoint}/v1/models`, {
+			const modelsUrl = endpoint.endsWith('/') ? `${endpoint}v1/models` : `${endpoint}/v1/models`;
+			const response = await fetch(modelsUrl, {
 				method: "GET",
 				headers: { "User-Agent": this.userAgent },
 				signal: controller.signal,
@@ -326,7 +327,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-			const response = await fetch(`${endpoint}/v1/models`, {
+			const modelsUrl = endpoint.endsWith('/') ? `${endpoint}v1/models` : `${endpoint}/v1/models`;
+			const response = await fetch(modelsUrl, {
 				method: "GET",
 				headers: { "User-Agent": this.userAgent },
 				signal: controller.signal,
