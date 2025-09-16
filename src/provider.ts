@@ -51,8 +51,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private _emittedTextToolCallKeys = new Set<string>();
 	private _emittedTextToolCallIds = new Set<string>();
 
-	// Optional TGI endpoint from VS Code settings
-	private _tgiEndpoint: string | undefined;
+	// Optional vLLM/local inference endpoint from VS Code settings
+	private _localEndpoint: string | undefined;
+	// Cache for model context limits
+	private _modelContextLimits: Map<string, number> = new Map();
 
 	/**
 	 * Create a provider using the given secret storage for the API key.
@@ -63,9 +65,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		const config = vscode.workspace.getConfiguration('huggingface');
 		const endpoint = config.get<string>('customTGIEndpoint');
 		// Trim whitespace to avoid URL parsing issues
-		this._tgiEndpoint = endpoint?.trim();
-		if (this._tgiEndpoint) {
-			logger.info(`TGI endpoint configured: ${this._tgiEndpoint}`);
+		this._localEndpoint = endpoint?.trim();
+		if (this._localEndpoint) {
+			logger.info(`Local inference endpoint configured: ${this._localEndpoint}`);
 		}
 	}
 
@@ -105,21 +107,31 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	): Promise<LanguageModelChatInformation[]> {
 		const infos: LanguageModelChatInformation[] = [];
 
-		// Add TGI models if configured
-		if (this._tgiEndpoint) {
-			// Fetch available models from TGI endpoint
+		// Add local inference models if configured
+		if (this._localEndpoint) {
+			// Fetch available models from local inference endpoint
 			try {
-				const tgiModels = await this.fetchTGIModels(this._tgiEndpoint);
-				for (const model of tgiModels) {
-					const hostname = new URL(this._tgiEndpoint).hostname;
+				const localModels = await this.fetchLocalModels(this._localEndpoint);
+				for (const model of localModels) {
+					const hostname = new URL(this._localEndpoint).hostname;
+					const modelId = `local|${this._localEndpoint}|${model}`;
+
+					// Use dynamic context limit if available, otherwise use conservative defaults
+					const contextLimit = this._modelContextLimits.get(modelId) || 2048;
+					// CRITICAL: vLLM adds ~400-500 tokens for chat template formatting!
+					// We must be VERY conservative to avoid "token limit exceeded" errors
+					// For 2048 context: 2048 - 500 (template) - 200 (output) = 1348 safe input
+					const maxInputTokens = Math.floor(contextLimit * 0.65);  // ~1330 tokens for 2048 context
+					const maxOutputTokens = Math.floor(contextLimit * 0.15); // ~307 tokens for output
+
 					infos.push({
-						id: `tgi|${this._tgiEndpoint}|${model}`,
+						id: modelId,
 						name: `${model} @ ${hostname}`,
-						tooltip: `TGI model ${model} at ${this._tgiEndpoint}`,
+						tooltip: `Local model ${model} at ${this._localEndpoint} (${contextLimit} token context)`,
 						family: "huggingface",
 						version: "1.0.0",
-						maxInputTokens: 4096,
-						maxOutputTokens: 2048,
+						maxInputTokens,
+						maxOutputTokens,
 						capabilities: {
 							toolCalling: false,
 							imageInput: false,
@@ -127,17 +139,26 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					} satisfies LanguageModelChatInformation);
 				}
 			} catch (e) {
-				// If we can't fetch models, add a generic TGI entry
-				logger.error(" Failed to fetch TGI models", e);
-				const hostname = this._tgiEndpoint.replace(/^https?:\/\//, '').split('/')[0];
+				// If we can't fetch models, add a generic local inference entry
+				logger.error("Failed to fetch local models", e);
+				const hostname = this._localEndpoint.replace(/^https?:\/\//, '').split('/')[0];
+				const modelId = `local|${this._localEndpoint}|default`;
+
+				// Try to detect context limit even when we can't fetch models
+				const contextLimit = await this.detectContextLimit(this._localEndpoint) || 2048;
+				// CRITICAL: vLLM adds ~400-500 tokens for chat template formatting!
+				// We must be VERY conservative to avoid "token limit exceeded" errors
+				const maxInputTokens = Math.floor(contextLimit * 0.65);  // ~1330 tokens for 2048 context
+				const maxOutputTokens = Math.floor(contextLimit * 0.15); // ~307 tokens for output
+
 				infos.push({
-					id: `tgi|${this._tgiEndpoint}|default`,
-					name: `TGI @ ${hostname}`,
-					tooltip: `TGI server at ${this._tgiEndpoint}`,
+					id: modelId,
+					name: `vLLM @ ${hostname}`,
+					tooltip: `vLLM server at ${this._localEndpoint} (${contextLimit} token context)`,
 					family: "huggingface",
 					version: "1.0.0",
-					maxInputTokens: 4096,
-					maxOutputTokens: 2048,
+					maxInputTokens,
+					maxOutputTokens,
 					capabilities: {
 						toolCalling: false,
 						imageInput: false,
@@ -149,7 +170,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Fetch HF Router models if API key is available
 		const apiKey = await this.ensureApiKey(options.silent);
 		if (!apiKey) {
-			return infos; // Return TGI model only if no API key
+			return infos; // Return local model only if no API key
 		}
 
 		const { models } = await this.fetchModels(apiKey);
@@ -228,7 +249,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * @param endpoint The TGI server endpoint.
 	 * @returns Health check result with status and reason.
 	 */
-	private async checkTGIHealth(endpoint: string): Promise<{ healthy: boolean; reason?: string }> {
+	private async checkLocalHealth(endpoint: string): Promise<{ healthy: boolean; reason?: string }> {
 		try {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for health check
@@ -259,10 +280,48 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	}
 
 	/**
-	 * Fetch available models from TGI server.
-	 * @param endpoint The TGI server endpoint.
+	 * Detect the context limit for a local server by querying the models endpoint.
+	 * @param endpoint The local inference server endpoint.
+	 * @returns The detected context limit or null if unable to detect.
 	 */
-	private async fetchTGIModels(endpoint: string): Promise<string[]> {
+	private async detectContextLimit(endpoint: string): Promise<number | null> {
+		try {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
+			const response = await fetch(`${endpoint}/v1/models`, {
+				method: "GET",
+				headers: { "User-Agent": this.userAgent },
+				signal: controller.signal,
+			});
+
+			clearTimeout(timeoutId);
+
+			if (!response.ok) {
+				return null;
+			}
+
+			const data = await response.json() as { data?: Array<{ max_model_len?: number }> };
+			// Get the first model's context limit
+			if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+				const firstModel = data.data[0];
+				if (firstModel.max_model_len) {
+					logger.info(`Detected context limit: ${firstModel.max_model_len} tokens`);
+					return firstModel.max_model_len;
+				}
+			}
+			return null;
+		} catch (error) {
+			logger.debug("Failed to detect context limit", error);
+			return null;
+		}
+	}
+
+	/**
+	 * Fetch available models from local inference server.
+	 * @param endpoint The local inference server endpoint.
+	 */
+	private async fetchLocalModels(endpoint: string): Promise<string[]> {
 		try {
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -276,21 +335,29 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			clearTimeout(timeoutId);
 
 			if (!response.ok) {
-				logger.warn(`Failed to fetch TGI models: ${response.status}`);
+				logger.warn(`Failed to fetch local models: ${response.status}`);
 				return [];
 			}
 
-			const data = await response.json() as { data?: Array<{ id?: string }> };
-			// TGI returns {"object": "list", "data": [{"id": "model-name", ...}]}
+			const data = await response.json() as { data?: Array<{ id?: string; max_model_len?: number }> };
+			// vLLM/Local servers return {"object": "list", "data": [{"id": "model-name", "max_model_len": 2048, ...}]}
 			if (data?.data && Array.isArray(data.data)) {
+				// Store context limits for each model
+				for (const model of data.data) {
+					if (model.id && model.max_model_len) {
+						const modelKey = `local|${endpoint}|${model.id}`;
+						this._modelContextLimits.set(modelKey, model.max_model_len);
+						logger.info(`Model ${model.id} has context limit: ${model.max_model_len} tokens`);
+					}
+				}
 				return data.data.map((m) => m.id || "unknown");
 			}
 			return [];
 		} catch (error) {
 			if (error instanceof Error && error.name === 'AbortError') {
-				logger.warn("Timeout fetching TGI models");
+				logger.warn("Timeout fetching local models");
 			} else {
-				logger.warn("Error fetching TGI models", error);
+				logger.warn("Error fetching local models", error);
 			}
 			return [];
 		}
@@ -376,31 +443,31 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			},
 		};
 		try {
-			// Check if this is a TGI model request
+			// Check if this is a local model request
 			let apiKey: string | undefined;
 			let baseUrl = BASE_URL;
-			let isTGI = false;
+			let isLocal = false;
 
-			if (model.id.startsWith('tgi|')) {
-				// TGI model - extract endpoint and model name from ID
-				// Format: tgi|endpoint|modelname
-				const parts = model.id.replace('tgi|', '').split('|');
+			if (model.id.startsWith('local|')) {
+				// Local model - extract endpoint and model name from ID
+				// Format: local|endpoint|modelname
+				const parts = model.id.replace('local|', '').split('|');
 				baseUrl = parts[0].trim();
 
-				// Validate TGI endpoint URL
+				// Validate local endpoint URL
 				try {
 					const url = new URL(baseUrl);
 					if (!url.protocol.startsWith('http')) {
 						throw new Error(`Invalid protocol: ${url.protocol}`);
 					}
 				} catch (urlError) {
-					logger.error("Invalid TGI endpoint URL", { endpoint: baseUrl, error: urlError });
-					throw new Error(`Invalid TGI endpoint URL: ${baseUrl}`);
+					logger.error("Invalid local endpoint URL", { endpoint: baseUrl, error: urlError });
+					throw new Error(`Invalid local endpoint URL: ${baseUrl}`);
 				}
 
-				apiKey = "dummy"; // TGI doesn't require API key
-				isTGI = true;
-				logger.info(`Processing TGI request to ${baseUrl}`, { modelId: model.id });
+				apiKey = "dummy"; // Local inference doesn't require API key
+				isLocal = true;
+				logger.info(`Processing local inference request to ${baseUrl}`, { modelId: model.id });
 			} else {
 				// HF Router model - need API key
 				apiKey = await this.ensureApiKey(true);
@@ -422,17 +489,77 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
             const inputTokenCount = this.estimateMessagesTokens(messages);
             const toolTokenCount = this.estimateToolTokens(toolConfig.tools);
-            const tokenLimit = Math.max(1, model.maxInputTokens);
-            if (inputTokenCount + toolTokenCount > tokenLimit) {
-                logger.error(" Message exceeds token limit", { total: inputTokenCount + toolTokenCount, tokenLimit });
-                throw new Error("Message exceeds token limit.");
+            const totalInputTokens = inputTokenCount + toolTokenCount;
+
+            // For local models, we need to handle vLLM's strict context limit
+            // Calculate the ACTUAL context limit (not what we report to VS Code)
+            let actualContextLimit = 2048; // Default
+            if (model.id.startsWith('local|')) {
+                // Try to get the real context limit from our cache
+                actualContextLimit = this._modelContextLimits.get(model.id) || 2048;
+            }
+
+            // Debug logging for token analysis
+            logger.info(`Token analysis:`, {
+                inputTokens: inputTokenCount,
+                toolTokens: toolTokenCount,
+                totalInputTokens,
+                actualContextLimit,
+                messageCount: messages.length,
+                modelId: model.id,
+                isLocalModel: isLocal,
+                estimatedVLLMTokens: isLocal ? Math.ceil(totalInputTokens * 1.2) + 500 : 'N/A',
+                firstMessage: messages[0]?.content?.slice(0, 50) + '...',
+                lastMessage: messages[messages.length - 1]?.content?.slice(0, 50) + '...'
+            });
+
+            // Don't reject messages - we'll handle allocation dynamically below
+            // VS Code already adds its context, we just need to fit within vLLM's limits
+
+            // Calculate available tokens for output based on ACTUAL context and input
+            // For local models, we must respect vLLM's strict context limit
+            let availableOutputTokens: number;
+
+            if (model.id.startsWith('local|')) {
+                // CRITICAL: vLLM adds ~400-500 tokens for chat template!
+                // Our estimator underestimates by 10-20%, plus template overhead
+                // Example: We estimate 2130, vLLM sees 2532 (402 token difference!)
+                const VLLM_TEMPLATE_OVERHEAD = 500; // Chat template tokens
+                const ESTIMATION_ERROR_FACTOR = 1.2; // Our estimator is 20% low
+
+                // Calculate what vLLM will actually see
+                const estimatedVLLMTokens = Math.ceil(totalInputTokens * ESTIMATION_ERROR_FACTOR) + VLLM_TEMPLATE_OVERHEAD;
+                const remainingTokens = actualContextLimit - estimatedVLLMTokens;
+
+                // Be VERY conservative with output tokens
+                if (remainingTokens < 50) {
+                    availableOutputTokens = 50; // Absolute minimum
+                    logger.warn(`Input tokens likely exceed limit. Estimated: ${totalInputTokens}, vLLM will see: ~${estimatedVLLMTokens}, context: ${actualContextLimit}`);
+                } else {
+                    availableOutputTokens = Math.min(
+                        Math.floor(remainingTokens * 0.9), // Use 90% of remaining space
+                        500 // Cap at 500 for reasonable response
+                    );
+                }
+
+                logger.info(`vLLM token calculation: input estimate=${totalInputTokens}, predicted vLLM tokens=${estimatedVLLMTokens}, remaining=${remainingTokens}, max_tokens=${availableOutputTokens}`);
+            } else {
+                // For HF models: use the original calculation
+                const totalContextLength = model.maxInputTokens + model.maxOutputTokens;
+                availableOutputTokens = Math.min(
+                    Math.max(100, totalContextLength - totalInputTokens - 100),
+                    model.maxOutputTokens
+                );
             }
 
             requestBody = {
                 model: model.id,
                 messages: openaiMessages,
                 stream: true,
-                max_tokens: Math.min(options.modelOptions?.max_tokens || 4096, model.maxOutputTokens),
+                max_tokens: Math.min(
+                    options.modelOptions?.max_tokens || availableOutputTokens,
+                    availableOutputTokens
+                ),
                 temperature: options.modelOptions?.temperature ?? 0.7,
             };
 
@@ -456,26 +583,23 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (toolConfig.tool_choice) {
 				(requestBody as Record<string, unknown>).tool_choice = toolConfig.tool_choice;
 			}
-			// For TGI, use completions endpoint (chat endpoint has template issues)
+			// For local inference, use appropriate endpoint based on server type
+			// vLLM supports chat/completions better
 			// Ensure proper URL construction
-			const endpoint = model.id.startsWith('tgi|')
-				? baseUrl.endsWith('/') ? `${baseUrl}v1/completions` : `${baseUrl}/v1/completions`
+			const endpoint = model.id.startsWith('local|')
+				? baseUrl.endsWith('/') ? `${baseUrl}v1/chat/completions` : `${baseUrl}/v1/chat/completions`
 				: `${baseUrl}/chat/completions`;
 
-			// Adjust request for TGI completions endpoint
-			if (model.id.startsWith('tgi|')) {
-				// Convert to completions format for TGI
-				const lastMessage = openaiMessages[openaiMessages.length - 1];
-				const tgiRequestBody = requestBody as Record<string, unknown>;
-				tgiRequestBody.prompt = lastMessage.content || "";
-				// Extract model name from ID (format: tgi|endpoint|modelname)
+			// For vLLM/local servers using chat/completions, keep the chat format
+			if (model.id.startsWith('local|')) {
+				// Keep chat format for vLLM (it works better with chat/completions)
+				// Extract model name from ID (format: local|endpoint|modelname)
 				const modelName = model.id.split('|')[2] || "bigcode/starcoder2-3b";
-				tgiRequestBody.model = modelName === "default" ? "bigcode/starcoder2-3b" : modelName;
-				delete tgiRequestBody.messages;
-				logger.debug(`TGI request prepared`, {
+				requestBody.model = modelName === "default" ? "bigcode/starcoder2-3b" : modelName;
+				logger.debug(`Local inference request prepared`, {
 					endpoint,
-					model: (requestBody as Record<string, unknown>).model,
-					promptLength: ((requestBody as Record<string, unknown>).prompt as string).length,
+					model: requestBody.model,
+					messageCount: openaiMessages.length,
 					maxTokens: requestBody.max_tokens
 				});
 			} else {
@@ -487,21 +611,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				});
 			}
 
-			// For TGI, optionally check server health first
-			if (isTGI) {
-				const healthCheckResult = await this.checkTGIHealth(baseUrl);
+			// For local servers, optionally check server health first
+			if (isLocal) {
+				const healthCheckResult = await this.checkLocalHealth(baseUrl);
 				if (!healthCheckResult.healthy) {
-					logger.error("TGI server health check failed", {
+					logger.error("Local server health check failed", {
 						endpoint: baseUrl,
 						reason: healthCheckResult.reason
 					});
-					throw new Error(`TGI server is not healthy: ${healthCheckResult.reason}`);
+					throw new Error(`Local server is not healthy: ${healthCheckResult.reason}`);
 				}
 			}
 
 			let response: Response;
 			let retryCount = 0;
-			const maxRetries = isTGI ? 2 : 0; // Retry TGI requests up to 2 times
+			const maxRetries = isLocal ? 2 : 0; // Retry local requests up to 2 times
 
 			while (true) {
 				try {
@@ -546,11 +670,11 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 						} : String(fetchError)
 					});
 
-					if (isTGI) {
+					if (isLocal) {
 						throw new Error(
-							`Failed to connect to TGI server at ${baseUrl}. ` +
+							`Failed to connect to local server at ${baseUrl}. ` +
 							`Please check:\n` +
-							`1. The TGI server is running (docker ps)\n` +
+							`1. The local server is running (docker ps)\n` +
 							`2. The endpoint URL is correct: ${baseUrl}\n` +
 							`3. No firewall is blocking the connection\n` +
 							`Error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`
@@ -573,24 +697,24 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					modelId: model.id
 				});
 
-				// Provide more specific error messages for common TGI issues
-				if (isTGI) {
+				// Provide more specific error messages for common local server issues
+				if (isLocal) {
 					if (response.status === 404) {
 						throw new Error(
-							`TGI endpoint not found (404). Please check:\n` +
+							`Local endpoint not found (404). Please check:\n` +
 							`1. The endpoint URL is correct: ${baseUrl}\n` +
-							`2. TGI is configured to serve at /v1/completions`
+							`2. vLLM is configured to serve at /v1/chat/completions`
 						);
 					} else if (response.status === 503) {
 						throw new Error(
-							`TGI server unavailable (503). The server may be:\n` +
+							`Local server unavailable (503). The server may be:\n` +
 							`1. Still loading the model\n` +
 							`2. Out of memory\n` +
 							`3. Crashed - check Docker logs with: docker logs <container>`
 						);
 					} else if (response.status === 500) {
 						throw new Error(
-							`TGI server error (500). Common causes:\n` +
+							`Local server error (500). Common causes:\n` +
 							`1. Model quantization issues\n` +
 							`2. Input exceeds context length\n` +
 							`3. Memory allocation failure\n` +
@@ -599,12 +723,12 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 						);
 					} else if (response.status === 422) {
 						throw new Error(
-							`TGI request validation failed (422). The request format may be incompatible.\n` +
+							`Local request validation failed (422). The request format may be incompatible.\n` +
 							`Error: ${errorText ? errorText.substring(0, 200) : 'none'}`
 						);
 					} else {
 						throw new Error(
-							`TGI server error: ${response.status} ${response.statusText}\n` +
+							`Local server error: ${response.status} ${response.statusText}\n` +
 							`Error: ${errorText ? errorText.substring(0, 200) : 'none'}`
 						);
 					}
@@ -617,9 +741,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 			if (!response.body) {
 				logger.error("No response body from API", { endpoint, modelId: model.id });
-				if (isTGI) {
+				if (isLocal) {
 					throw new Error(
-						`No response body from TGI server. This may indicate:\n` +
+						`No response body from local server. This may indicate:\n` +
 						`1. The server crashed during processing\n` +
 						`2. Network connection was interrupted\n` +
 						`Check server status with: curl ${baseUrl}/health`
@@ -630,7 +754,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			logger.debug("Processing streaming response...");
-			await this.processStreamingResponse(response.body, trackingProgress, token, isTGI ? baseUrl : undefined);
+			await this.processStreamingResponse(response.body, trackingProgress, token, isLocal ? baseUrl : undefined);
 			logger.debug("Streaming response completed successfully");
 		} catch (err) {
 			logger.error("Chat request failed", {
@@ -802,7 +926,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 				try {
 					if (tgiEndpoint) {
 						progress.report(new vscode.LanguageModelTextPart(
-							"The TGI server returned an empty response. Common causes:\n" +
+							"The local server returned an empty response. Common causes:\n" +
 							"1. Model crashed during generation (check Docker logs)\n" +
 							"2. Input prompt exceeded context length\n" +
 							"3. Out of GPU memory\n\n" +
@@ -873,7 +997,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
                 // ignore errors here temporarily
             }
 
-            // Handle both HF Router format (delta.content) and TGI format (text)
+            // Handle both HF Router format (delta.content) and local format (text)
             const textContent = deltaObj?.content || choice.text;
             if (textContent) {
                 const content = String(textContent);

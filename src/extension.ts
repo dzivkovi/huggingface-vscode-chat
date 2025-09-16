@@ -20,16 +20,17 @@ export function activate(context: vscode.ExtensionContext) {
 	vscode.lm.registerLanguageModelChatProvider("huggingface", provider);
 	logger.info("Hugging Face Chat Provider registered successfully");
 
-	// Listen for configuration changes to update TGI endpoint
+	// Listen for configuration changes to update local inference endpoint
+	// Note: Configuration key name remains 'customTGIEndpoint' for backward compatibility
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeConfiguration(e => {
 			if (e.affectsConfiguration('huggingface.customTGIEndpoint')) {
 				const newEndpoint = vscode.workspace.getConfiguration('huggingface').get<string>('customTGIEndpoint');
-				logger.info(`TGI endpoint configuration changed to: ${newEndpoint}`);
-				// Provider will reload TGI endpoint in its constructor
+				logger.info(`Local inference endpoint configuration changed to: ${newEndpoint}`);
+				// Provider will reload local endpoint in its constructor
 				// For now, user needs to reload window for changes to take effect
 				vscode.window.showInformationMessage(
-					'TGI endpoint configuration changed. Please reload the window for changes to take effect.',
+					'Local inference endpoint configuration changed. Please reload the window for changes to take effect.',
 					'Reload'
 				).then(selection => {
 					if (selection === 'Reload') {

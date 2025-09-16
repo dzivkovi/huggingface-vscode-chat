@@ -1,8 +1,16 @@
 import * as vscode from 'vscode';
 
+enum LogLevel {
+    DEBUG = 0,
+    INFO = 1,
+    WARN = 2,
+    ERROR = 3
+}
+
 class Logger {
     private outputChannel: vscode.OutputChannel;
     private startTime: number;
+    private logLevel: LogLevel = LogLevel.INFO; // Default to INFO level
 
     constructor() {
         this.outputChannel = vscode.window.createOutputChannel('Hugging Face Chat Provider');
@@ -47,9 +55,11 @@ class Logger {
     }
 
     debug(message: string, data?: unknown): void {
-        const formatted = this.formatMessage('DEBUG', message, data);
-        this.outputChannel.appendLine(formatted);
-        console.log(formatted);
+        if (this.logLevel <= LogLevel.DEBUG) {
+            const formatted = this.formatMessage('DEBUG', message, data);
+            this.outputChannel.appendLine(formatted);
+            console.log(formatted);
+        }
     }
 
     show(): void {
