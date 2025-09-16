@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { OpenAIChatMessage, OpenAIChatRole, OpenAIFunctionToolDef, OpenAIToolCall } from "./types";
+import { logger } from "./logger";
 
 // Tool calling sanitization helpers
 
@@ -217,7 +218,7 @@ export function convertTools(options: vscode.LanguageModelChatRequestHandleOptio
 	let tool_choice: "auto" | { type: "function"; function: { name: string } } = "auto";
 	if (options.toolMode === vscode.LanguageModelChatToolMode.Required) {
 		if (tools.length !== 1) {
-            console.error("[Hugging Face Model Provider] ToolMode.Required but multiple tools:", tools.length);
+            logger.error(" ToolMode.Required but multiple tools:", tools.length);
             throw new Error("LanguageModelChatToolMode.Required is not supported with more than one tool");
 		}
 		tool_choice = { type: "function", function: { name: sanitizeFunctionName(tools[0].name) } };
@@ -233,7 +234,7 @@ export function convertTools(options: vscode.LanguageModelChatRequestHandleOptio
 export function validateTools(tools: readonly vscode.LanguageModelChatTool[]): void {
 	for (const tool of tools) {
 		if (!tool.name.match(/^[\w-]+$/)) {
-            console.error("[Hugging Face Model Provider] Invalid tool name detected:", tool.name);
+            logger.error(" Invalid tool name detected:", tool.name);
             throw new Error(
                 `Invalid tool name "${tool.name}": only alphanumeric characters, hyphens, and underscores are allowed.`
             );
@@ -248,7 +249,7 @@ export function validateTools(tools: readonly vscode.LanguageModelChatTool[]): v
 export function validateRequest(messages: readonly vscode.LanguageModelChatRequestMessage[]): void {
 	const lastMessage = messages[messages.length - 1];
 	if (!lastMessage) {
-    console.error("[Hugging Face Model Provider] No messages in request");
+    logger.error(" No messages in request");
     throw new Error("Invalid request: no messages.");
 	}
 
@@ -269,7 +270,7 @@ export function validateRequest(messages: readonly vscode.LanguageModelChatReque
 			while (toolCallIds.size > 0) {
 				const nextMessage = messages[nextMessageIdx++];
 				if (!nextMessage || nextMessage.role !== vscode.LanguageModelChatMessageRole.User) {
-                    console.error("[Hugging Face Model Provider] Validation failed: missing tool result for call IDs:", Array.from(toolCallIds));
+                    logger.error(" Validation failed: missing tool result for call IDs:", Array.from(toolCallIds));
                     throw new Error(errMsg);
 				}
 
@@ -278,7 +279,7 @@ export function validateRequest(messages: readonly vscode.LanguageModelChatReque
 						const ctorName =
 							(Object.getPrototypeOf(part as object) as { constructor?: { name?: string } } | undefined)?.constructor
 								?.name ?? typeof part;
-                        console.error("[Hugging Face Model Provider] Validation failed: expected tool result part, got:", ctorName);
+                        logger.error(" Validation failed: expected tool result part, got:", ctorName);
                         throw new Error(errMsg);
 					}
 					const callId = (part as { callId: string }).callId;

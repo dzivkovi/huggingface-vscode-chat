@@ -43,11 +43,34 @@ Common scripts:
 * Lint: `npm run lint`
 * Format: `npm run format`
 
+📖 **For detailed guides**, see our [comprehensive documentation](docs/README.md)
+
+---
+
+## 🖥️ Using Custom TGI Servers
+
+This extension supports connecting to your own Text Generation Inference (TGI) servers for private model hosting.
+
+### Configuration
+1. Open VS Code Settings (Ctrl+,)
+2. Search for "huggingface.customTGIEndpoint"
+3. Enter your TGI server URL (e.g., `http://192.168.1.100:8080`)
+4. Reload VS Code
+5. Your TGI models will appear in the model picker
+
+### Troubleshooting
+See the [TGI Troubleshooting Guide](docs/06-troubleshooting-tgi.md) for detailed help with:
+- Connection issues
+- Empty responses
+- Model loading problems
+- Performance optimization
+
 ---
 
 ## 📚 Learn more
 * Inference Providers documentation: https://huggingface.co/docs/inference-providers/index
 * VS Code Chat Provider API: https://code.visualstudio.com/api/extension-guides/ai/language-model-chat-provider
+* TGI Documentation: https://huggingface.co/docs/text-generation-inference
 
 ---
 
