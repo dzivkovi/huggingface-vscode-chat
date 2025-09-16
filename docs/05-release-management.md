@@ -19,12 +19,16 @@ npx @vscode/vsce package
 
 ### 2. Organize Release Files
 ```bash
+# Clean up any old VSIX files in root
+rm -f extension.vsix *.vsix
+
 # Copy to releases folder with version and latest
 cp huggingface-vscode-chat-*.vsix releases/
-cp huggingface-vscode-chat-*.vsix releases/huggingface-vscode-chat-latest.vsix
+cp releases/huggingface-vscode-chat-*.vsix releases/huggingface-vscode-chat-latest.vsix
 
-# Verify files
+# Verify files (both should be same size)
 ls -la releases/
+# Should show identical file sizes for versioned and latest
 ```
 
 ### 3. Update Documentation
