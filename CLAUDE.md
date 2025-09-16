@@ -36,7 +36,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Extension Development:**
 - Press F5 in VS Code to launch Extension Development Host for testing
-- Use `npx @vscode/vsce package` to create VSIX package for distribution
+- Use `npm run package` to create VSIX package for development
+- Use `npm run release` to create binary distribution in releases/ folder
 - Use `scripts/rebuild-extension.sh` for quick rebuild and install cycle
 - Use `scripts/test-vllm.sh` for testing vLLM API endpoints
 
@@ -138,6 +139,11 @@ scripts/rebuild-extension.sh
 
 ## Release Process
 
+**Simple Binary Distribution:**
+- `npm run release` - Creates VSIX and copies to releases/ folder for business users
+- Commit releases/ folder to provide download links in GitHub
+
+**Marketplace Publishing:**
 - Releases use GitHub Actions workflow triggered on `release/**` branches
 - Version in package.json must match branch tag
 - Automated VSIX packaging and VS Code Marketplace publishing
