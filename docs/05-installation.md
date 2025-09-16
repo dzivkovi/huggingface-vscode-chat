@@ -25,31 +25,32 @@ code --install-extension huggingface-vscode-chat-0.0.5.vsix
 ### Configuration Options
 
 #### Option 1: Use Hugging Face Router (Cloud)
-Default configuration - requires API key:
-```json
-{
-  "huggingface.inferenceBackend": "router",
-  "huggingface.baseUrl": "https://router.huggingface.co/v1",
-  "huggingface.requiresApiKey": true
-}
-```
+Default configuration - requires API key. No settings changes needed, just:
+1. Open VS Code's chat interface
+2. Click the model picker and click "Manage Models..."
+3. Select "Hugging Face" provider
+4. Provide your Hugging Face Token
 
-Then run the command: `Hugging Face: Manage Hugging Face Provider` to set your API key.
-
-#### Option 2: Use Local TGI Server
+#### Option 2: Use Local vLLM Server (Recommended for Local)
 For on-premise/air-gapped setups with GPU:
-```json
-{
-  "huggingface.inferenceBackend": "tgi",
-  "huggingface.baseUrl": "http://localhost:8080",
-  "huggingface.requiresApiKey": false
-}
-```
+1. Start your vLLM server (see **[06-setup-vllm.md](./06-setup-vllm.md)**)
+2. Open VS Code Settings (Ctrl+,)
+3. Search for "huggingface.customTGIEndpoint"
+4. Enter your vLLM server URL: `http://localhost:8000`
+5. Reload VS Code when prompted
 
-**Setup Required**: See **[04-setup-tgi.md](./04-setup-tgi.md)** for complete TGI server installation.
+**Note**: Despite the setting name "customTGIEndpoint", this works perfectly with vLLM servers.
 
-#### Option 3: Use Local Ollama
-For CPU-only systems:
+#### Option 3: Use Local TGI Server (Legacy/Deprecated)
+⚠️ **Not recommended due to stability issues**
+1. Start your TGI server (see **[04-setup-tgi.md](./04-setup-tgi.md)**)
+2. Open VS Code Settings (Ctrl+,)
+3. Search for "huggingface.customTGIEndpoint"
+4. Enter your TGI server URL: `http://localhost:8080`
+5. Reload VS Code when prompted
+
+#### Option 4: Use Local Ollama (CPU-Only)
+For systems without NVIDIA GPUs:
 ```json
 {
   "huggingface.inferenceBackend": "ollama",

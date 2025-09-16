@@ -33,11 +33,23 @@
 - **Approved channel**: Uses existing enterprise VS Code deployment
 - **Tool calling**: Full OpenAI API compatibility preserved
 
-## Technical Decision: TGI Over Alternatives
+## Technical Decision: vLLM Over TGI
 
-### Why TGI for Enterprise
-- **GPU-optimized**: Maximum performance on H200 hardware
-- **Production-ready**: Hugging Face's enterprise inference solution
+### Why vLLM for Enterprise (Updated Recommendation)
+- **PagedAttention**: Superior memory management prevents OOM crashes
+- **Higher throughput**: ~2-3x faster inference than TGI on same hardware
+- **Better stability**: No integer overflow or memory fragmentation issues
+- **AWQ quantization**: More stable than TGI's bitsandbytes-nf4
+- **OpenAI compatibility**: Native `/v1/chat/completions` endpoint support
+
+### Legacy TGI Support
+TGI remains supported but is deprecated due to:
+- Integer overflow crashes with large context windows
+- Memory management issues requiring frequent restarts
+- Incompatible endpoint format requiring conversion overhead
+
+### Model Selection for Hardware
+See **[08-model-selection-guide.md](./08-model-selection-guide.md)** for detailed recommendations on choosing models based on your GPU VRAM, including specific guidance for RTX 4060 and other common configurations.
 - **Model flexibility**: Support for latest coding models
 - **Memory efficiency**: Quantization support for various hardware tiers
 

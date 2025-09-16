@@ -1,28 +1,31 @@
-# TGI (Text Generation Inference) Troubleshooting Guide
+# Local Inference Server Troubleshooting Guide
 
-This guide helps troubleshoot common issues when using TGI servers with the Hugging Face VS Code extension.
+This guide helps troubleshoot common issues when using vLLM or TGI servers with the Hugging Face VS Code extension.
 
 ## Common Error Messages and Solutions
 
 ### 1. Connection Failed Errors
 
-#### Error: "Failed to connect to TGI server"
+#### Error: "Failed to connect to server"
 **Causes:**
-- TGI server is not running
+- Server is not running
 - Incorrect endpoint URL
 - Firewall blocking connection
 - Docker container not exposed on the correct port
 
 **Solutions:**
-1. Check if TGI is running:
+
+For vLLM:
+1. Check if vLLM is running:
    ```bash
-   docker ps | grep text-generation-inference
+   docker ps | grep vllm
    ```
 
 2. Verify the endpoint URL in VS Code settings:
    - Open Settings (Ctrl+,)
    - Search for "huggingface.customTGIEndpoint"
-   - Ensure format is: `http://192.168.160.1:8080` (no trailing slash)
+   - For vLLM: `http://localhost:8000` (no trailing slash)
+   - For TGI: `http://localhost:8080` (no trailing slash)
 
 3. Test connectivity:
    ```bash
@@ -34,35 +37,35 @@ This guide helps troubleshoot common issues when using TGI servers with the Hugg
    docker inspect <container_id> | grep -A 10 "PortBindings"
    ```
 
-### 2. Empty Response Errors
+### 2. Token Limit Errors
 
-#### Error: "The TGI server returned an empty response"
+#### vLLM: "maximum context length is 2048 tokens"
 **Common Causes:**
-1. **Model crashed during generation**
-   - Check Docker logs: `docker logs <container_name>`
-   - Look for errors like:
-     - `ValueError: Value out of range`
-     - Integer overflow errors
-     - Memory allocation failures
+1. **Input too large for model context**
+   - vLLM strictly enforces context limits
+   - Extension automatically calculates max_tokens based on input size
 
-2. **Input exceeds context length**
-   - Reduce prompt size
-   - Check model's maximum context length
+**Solutions:**
+- Reduce prompt size
+- Use a model with larger context window
+- Check actual context limit: `curl http://localhost:8000/v1/models`
 
-3. **Out of GPU memory**
-   - Monitor GPU memory: `nvidia-smi`
-   - Consider using smaller batch size or quantized models
+#### TGI: "The server returned an empty response"
+**Common Causes:**
+1. **Model crashed (integer overflow)**
+   - TGI has known stability issues with large contexts
+   - Consider switching to vLLM
 
 **Solutions:**
 ```bash
-# View TGI logs
+# View server logs
 docker logs --tail 100 <container_name>
 
-# Restart TGI with lower max tokens
-docker restart <container_name>
+# For vLLM - check model info
+curl http://localhost:8000/v1/models
 
-# Check GPU memory usage
-watch -n 1 nvidia-smi
+# For TGI - restart container
+docker restart <container_name>
 ```
 
 ### 3. HTTP Status Errors
