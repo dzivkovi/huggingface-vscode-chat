@@ -5,5 +5,24 @@
     "git.branchProtection": [
         "main"
     ],
-    "files.trimTrailingWhitespace": true
+    "files.trimTrailingWhitespace": true,
+    "huggingface.customTGIEndpoint": "http://localhost:8000",
+
+    // Reduce GitHub Copilot Chat context to help with token limits
+    // These are REAL settings from VS Code documentation:
+
+    // Disable temporal context (recently viewed/edited files)
+    "github.copilot.chat.editor.temporalContext.enabled": false,
+    "github.copilot.chat.edits.temporalContext.enabled": false,
+
+    // Disable git history suggestions
+    "github.copilot.chat.edits.suggestRelatedFilesFromGitHistory": false,
+
+    // Other settings that might help reduce token usage:
+    "chat.editor.wordWrap": "off",
+    "chat.checkpoints.showFileChanges": false,
+
+    // Note: These settings do NOT exist but won't hurt (VS Code will ignore them):
+    // "github.copilot.chat.contextProviders.workspace": false,
+    // "github.copilot.chat.contextProviders.editor": false
 }
