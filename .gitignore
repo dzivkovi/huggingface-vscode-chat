@@ -5,3 +5,10 @@ node_modules
 *.vsix
 .DS_Store
 vscode.d.ts
+
+# TGI/Ollama model cache
+data/
+*.log
+.ollama/
+
+.claude/settings.local.json
