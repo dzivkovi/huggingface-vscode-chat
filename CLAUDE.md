@@ -2,6 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL: Engineering Mindset
+
+**Defensive Programming Psychology:**
+- ALWAYS evaluate 2-3 solution alternatives before implementation
+- Question assumptions, validate with evidence
+- Prefer incremental, testable changes over big rewrites
+- Document decision rationale in analysis/ folder for complex choices
+
+**Technical Assessment Standards:**
+- Be objective, not enthusiastic - focus on concrete technical merits
+- Grade work accurately: A+ only for exceptional innovation
+- Call out trade-offs and limitations honestly
+- Reality-check claims with evidence
+
+**Research-First Approach:**
+- Use TodoWrite for multi-step technical analysis
+- Research alternatives thoroughly before recommending
+- Fact-check technical claims, especially comparisons
+- Document systematic analysis for future reference
+
 ## CRITICAL: Test-Driven Development (TDD) Requirements
 
 **⚠️ MANDATORY: ALL changes MUST follow strict TDD practices:**
