@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Write",
+      "Edit",
+      "Bash"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Bash(gh repo delete:*)",
+      "Bash(gh project delete:*)",
+      "Bash(gh release delete:*)",
+      "Bash(gh secret:*)",
+      "Bash(gh auth token:*)"
+    ],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7",
+    "memory"
+  ]
+}
