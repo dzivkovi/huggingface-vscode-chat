@@ -6,7 +6,7 @@
 2. **[Backend Decisions](02-backend-decisions.md)** - Why vLLM over alternatives
 3. **[Development Setup](03-setup-development.md)** - Build and test the extension
 4. **[Local Inference Setup](04-local-inference-setup.md)** - Deploy vLLM for air-gapped environments
-5. **[Installation Guide](05-installation.md)** - Install and configure the extension
+5. **[Release Management](05-release-management.md)** - Create and distribute pre-built VSIX packages
 
 ## Quick Start for Common Use Cases
 
