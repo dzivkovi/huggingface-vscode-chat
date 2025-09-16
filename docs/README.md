@@ -8,9 +8,10 @@ Read the documentation in this order based on your role and goals:
 
 ### For End Users (Just Want to Use the Extension)
 1. **[05-installation.md](./05-installation.md)** - Install and configure the extension
-2. **[04-setup-tgi.md](./04-setup-tgi.md)** - Set up local TGI server (optional)
-3. **[06-troubleshooting-tgi.md](./06-troubleshooting-tgi.md)** - Troubleshoot TGI issues
-4. **[07-viewing-logs.md](./07-viewing-logs.md)** - Access extension logs
+2. **[06-setup-vllm.md](./06-setup-vllm.md)** - Set up local vLLM server (recommended)
+3. **[07-vllm-vscode-integration.md](./07-vllm-vscode-integration.md)** - Configure VS Code for vLLM
+4. **[04-setup-tgi.md](./04-setup-tgi.md)** - Set up local TGI server (legacy/deprecated)
+5. **[07-viewing-logs.md](./07-viewing-logs.md)** - Access extension logs
 
 ### For Developers (Want to Modify/Contribute)
 1. **[01-architecture.md](./01-architecture.md)** - Understand the technical design
@@ -33,9 +34,9 @@ Read the documentation in this order based on your role and goals:
 
 ### I Want Local AI (30 minutes)
 1. Install Docker and ensure GPU support
-2. Follow **[04-setup-tgi.md](./04-setup-tgi.md)** to run TGI server
-3. Follow **[05-installation.md](./05-installation.md)** → "Option 2: Use Local TGI Server"
-4. Configure extension for local inference
+2. Follow **[06-setup-vllm.md](./06-setup-vllm.md)** to run vLLM server (recommended)
+3. Follow **[07-vllm-vscode-integration.md](./07-vllm-vscode-integration.md)** to configure VS Code
+4. Alternative: **[04-setup-tgi.md](./04-setup-tgi.md)** for TGI (legacy support)
 
 ### I Want to Develop/Contribute (60 minutes)
 1. Clone the repository
@@ -54,13 +55,13 @@ Read the documentation in this order based on your role and goals:
 ### What This Extension Does
 - **Integrates** with GitHub Copilot Chat interface
 - **Provides** Hugging Face models as language model provider
-- **Supports** multiple backends: Cloud (Router), Local (TGI), CPU (Ollama)
+- **Supports** multiple backends: Cloud (Router), Local (vLLM/TGI), CPU (Ollama)
 - **Enables** air-gapped enterprise deployments
 
 ### What You Get
 - **Same VS Code experience** as GitHub Copilot Chat
 - **Choice of models** from Hugging Face ecosystem
-- **Local inference** for privacy/security
+- **Local inference** for privacy/security (vLLM recommended)
 - **Enterprise-ready** air-gapped deployment
 
 ### Prerequisites
@@ -88,7 +89,10 @@ Read the documentation in this order based on your role and goals:
 | [01-architecture.md](./01-architecture.md) | Technical design | Developers | 15 min |
 | [02-backend-decisions.md](./02-backend-decisions.md) | Business strategy | Decision makers | 10 min |
 | [03-setup-development.md](./03-setup-development.md) | Dev environment | Developers | 30 min |
-| [04-setup-tgi.md](./04-setup-tgi.md) | Local inference | Users/Admins | 45 min |
+| [04-setup-tgi.md](./04-setup-tgi.md) | Local TGI (legacy) | Users/Admins | 45 min |
+| [06-setup-vllm.md](./06-setup-vllm.md) | Local vLLM (recommended) | Users/Admins | 30 min |
+| [07-vllm-vscode-integration.md](./07-vllm-vscode-integration.md) | vLLM VS Code setup | Users/Admins | 10 min |
+| [08-model-selection-guide.md](./08-model-selection-guide.md) | Choose models for your hardware | Developers | 15 min |
 | [05-installation.md](./05-installation.md) | Extension install | Everyone | 10 min |
 | [06-troubleshooting-tgi.md](./06-troubleshooting-tgi.md) | TGI debugging | Users/Admins | 20 min |
 | [07-viewing-logs.md](./07-viewing-logs.md) | Log access | Everyone | 5 min |

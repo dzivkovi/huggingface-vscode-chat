@@ -13,31 +13,30 @@ VS Code GitHub Copilot Chat Interface
             ↓
     HuggingFaceChatModelProvider
             ↓
-    ConfigurableBackend {
-        - router   (HF cloud)
-        - tgi      (Text Generation Inference)
-        - ollama   (Local CPU/GPU)
-        - custom   (OpenAI-compatible)
-    }
+    Current Implementation:
+        - router   (HF cloud - default)
+        - customTGIEndpoint (supports vLLM/TGI/OpenAI-compatible)
+
+    Supported Servers via customTGIEndpoint:
+        - vLLM     (Recommended for local GPU)
+        - TGI      (Legacy, deprecated)
+        - Ollama   (CPU-friendly)
+        - Any OpenAI-compatible server
 ```
 
 ### Configuration System
 
-**Settings-driven backend selection:**
-- `inferenceBackend`: enum ["router", "tgi", "ollama", "custom"]
-- `baseUrl`: dynamic endpoint (localhost:8080 for TGI)
-- `requiresApiKey`: auto-detection per backend
-- `contextLength` + `maxTokens`: model-specific tuning
+**Actual Implementation (as of v0.0.5):**
+- `huggingface.customTGIEndpoint`: URL for local inference server
+  - Works with vLLM, TGI, or any OpenAI-compatible endpoint
+  - Example: `http://localhost:8000` for vLLM
+  - Example: `http://localhost:8080` for TGI
 
-### Backend Auto-Detection
-
-```typescript
-// Smart defaults based on backend choice
-if (backend === "tgi") {
-    baseUrl = "http://localhost:8080";
-    requiresApiKey = false;
-}
-```
+**How It Works:**
+1. If `customTGIEndpoint` is set, extension uses it for local inference
+2. Models appear with prefix `tgi|` in the model picker
+3. Extension auto-detects model capabilities from server
+4. Dynamic token calculation based on model's context length
 
 ## Enterprise Benefits
 

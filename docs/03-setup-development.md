@@ -36,6 +36,15 @@ pnpm run test                  # Run test suite
 F5                             # Launch Extension Development Host
 ```
 
+### Development Scripts
+```bash
+# Quick rebuild and reinstall
+scripts/rebuild-extension.sh      # Compiles, packages, and reinstalls
+
+# Test vLLM API endpoints
+scripts/test-vllm.sh              # Tests model listing and chat completion
+```
+
 ### Package for Distribution
 
 #### Prerequisites for Packaging

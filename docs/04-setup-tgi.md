@@ -1,5 +1,7 @@
 # TGI Setup Guide for Hugging Face VS Code Extension
 
+> **⚠️ DEPRECATED**: TGI support is being phased out due to stability issues and memory crashes. **We recommend using [vLLM](./06-setup-vllm.md) instead** for better performance and reliability.
+
 This guide explains how to use the Hugging Face VS Code extension with a local Text Generation Inference (TGI) server for air-gapped and on-premise deployments.
 
 ## Prerequisites

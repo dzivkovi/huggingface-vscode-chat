@@ -16,10 +16,11 @@ The Hugging Face Chat Provider extension now includes comprehensive logging to h
 
 The extension logs:
 - Extension activation and initialization
-- TGI endpoint configuration
+- Local server endpoint configuration (vLLM/TGI)
 - Model discovery and loading
 - API requests (endpoint, model, parameters)
 - Streaming response events
+- Token calculation and limits
 - Parse errors and warnings
 - Connection issues and timeouts
 - Error details with stack traces
@@ -34,31 +35,32 @@ The extension logs:
 ## Example Log Output
 
 ```
-[2025-09-16T04:30:00.123Z] [0.001s] [INFO] Hugging Face Chat Provider extension activating...
-[2025-09-16T04:30:00.125Z] [0.003s] [INFO] Extension version: 0.0.5, VS Code version: 1.104.0
-[2025-09-16T04:30:00.126Z] [0.004s] [INFO] TGI endpoint configured: http://192.168.160.1:8080
-[2025-09-16T04:30:00.127Z] [0.005s] [INFO] Hugging Face Chat Provider registered successfully
-[2025-09-16T04:30:05.234Z] [5.112s] [INFO] Processing TGI request to http://192.168.160.1:8080
-[2025-09-16T04:30:05.235Z] [5.113s] [DEBUG] TGI request prepared
+[2025-09-16T10:30:00.123Z] [0.001s] [INFO] Hugging Face Chat Provider extension activating...
+[2025-09-16T10:30:00.125Z] [0.003s] [INFO] Extension version: 0.0.5, VS Code version: 1.104.0
+[2025-09-16T10:30:00.126Z] [0.004s] [INFO] TGI endpoint configured: http://localhost:8000
+[2025-09-16T10:30:00.127Z] [0.005s] [INFO] Hugging Face Chat Provider registered successfully
+[2025-09-16T10:30:05.234Z] [5.112s] [INFO] Processing TGI request to http://localhost:8000
+[2025-09-16T10:30:05.235Z] [5.113s] [DEBUG] TGI/vLLM request prepared
 {
-  "endpoint": "http://192.168.160.1:8080/v1/completions",
-  "model": "bigcode/starcoder2-3b",
-  "promptLength": 45,
-  "maxTokens": 2048
+  "endpoint": "http://localhost:8000/v1/chat/completions",
+  "model": "TheBloke/deepseek-coder-6.7B-instruct-AWQ",
+  "messageCount": 1,
+  "maxTokens": 100
 }
-[2025-09-16T04:30:05.567Z] [5.445s] [DEBUG] Request sent to http://192.168.160.1:8080/v1/completions
-[2025-09-16T04:30:05.789Z] [5.667s] [DEBUG] Stream started - receiving data
-[2025-09-16T04:30:08.123Z] [8.001s] [DEBUG] Received [DONE] signal from streaming response
-[2025-09-16T04:30:08.124Z] [8.002s] [DEBUG] Streaming response completed successfully
+[2025-09-16T10:30:05.567Z] [5.445s] [DEBUG] Request sent to http://localhost:8000/v1/chat/completions
+[2025-09-16T10:30:05.789Z] [5.667s] [DEBUG] Stream started - receiving data
+[2025-09-16T10:30:08.123Z] [8.001s] [DEBUG] Received [DONE] signal. Has emitted text: true
+[2025-09-16T10:30:08.124Z] [8.002s] [DEBUG] Stream ended normally
 ```
 
 ## Troubleshooting Common Issues
 
-### No Response from TGI
+### No Response from Server
 Look for:
 - `Processing TGI request to...` - Confirms request is being sent
-- `Request sent to...` - Shows the exact endpoint
+- `Request sent to...` - Shows the exact endpoint (vLLM or TGI)
 - `Stream started` - Indicates server is responding
+- Token limit errors for vLLM: `maximum context length is X tokens`
 - Any ERROR entries about timeouts or connection issues
 
 ### Parse Errors
@@ -74,4 +76,4 @@ Look for:
 
 ## Reload After Configuration Changes
 
-When you change the TGI endpoint in settings, the extension will prompt you to reload. Check the logs after reload to confirm the new endpoint is configured correctly.
+When you change the `huggingface.customTGIEndpoint` in settings, the extension will prompt you to reload. Check the logs after reload to confirm the new endpoint is configured correctly (works for both vLLM and TGI servers).
