@@ -9,3 +9,27 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+
+# Exclude large TGI model cache and logs
+data/**
+*.log
+/tmp/**
+
+# Exclude analysis and documentation
+analysis/**
+docs/**
+
+# Exclude unnecessary development files
+node_modules/**/.cache/**
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/*.md
+node_modules/**/*.txt
+node_modules/**/LICENSE*
+node_modules/**/CHANGELOG*
+
+# Exclude Claude settings
+.claude/**
+
+# Exclude test files
+src/test/**
