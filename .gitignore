@@ -3,6 +3,7 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+!releases/*.vsix
 .DS_Store
 vscode.d.ts
 

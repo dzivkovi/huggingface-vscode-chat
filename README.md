@@ -2,6 +2,22 @@
 
 ![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/inference-providers-guides/demo_vscode.gif)
 
+## 🚀 Quick Install (30 seconds)
+
+**Business users**: No compilation needed! Download and install immediately:
+
+### Option 1: Pre-Built Extension (Recommended)
+1. **[📦 Download Latest VSIX](./releases/huggingface-vscode-chat-latest.vsix)**
+2. **Install**: Press `Ctrl+Shift+P` → Type `Extensions: Install from VSIX...` → Select downloaded file
+3. **Done!** Restart VS Code and access via GitHub Copilot Chat model picker
+
+### Option 2: VS Code Marketplace
+[🛍️ Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat) (public releases)
+
+[📋 **All Releases & Installation Guide**](./releases/README.md)
+
+---
+
 **Air-Gapped Ready**: Run powerful LLMs locally with vLLM or TGI - no internet required for on-premise deployments.
 
 This VS Code extension enables GitHub Copilot Chat to work with:
@@ -20,7 +36,7 @@ For secure, on-premise environments where data cannot leave your network:
 4. **No API keys required, all processing stays on your infrastructure**
 
 ## Cloud Deployment (Hugging Face)
-1. Install the HF Copilot Chat extension [here](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat).
+1. **Install the extension**: [📦 Download VSIX](./releases/huggingface-vscode-chat-latest.vsix) or [🛍️ Marketplace](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat)
 2. Open VS Code's chat interface.
 3. Click the model picker and click "Manage Models...".
 4. Select "Hugging Face" provider.
