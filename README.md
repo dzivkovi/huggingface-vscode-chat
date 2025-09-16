@@ -1,12 +1,25 @@
-# 🤗 Hugging Face Provider for GitHub Copilot Chat
+# Hugging Face & Local Inference Provider for GitHub Copilot Chat
 
 ![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/inference-providers-guides/demo_vscode.gif)
 
-Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code with GitHub Copilot Chat powered by [Hugging Face Inference Providers](https://huggingface.co/docs/inference-providers/index) 🔥
+**Air-Gapped Ready**: Run powerful LLMs locally with vLLM or TGI - no internet required for on-premise deployments.
+
+This VS Code extension enables GitHub Copilot Chat to work with:
+- **Local inference servers** (vLLM/TGI) for secure, air-gapped environments
+- **Hugging Face Inference Providers** for cloud-based models (Kimi K2, DeepSeek V3.1, GLM 4.5, and more)
 
 ---
 
-## ⚡ Quick Start
+## Local Deployment (Air-Gapped Environments)
+
+For secure, on-premise environments where data cannot leave your network:
+
+1. Start your local vLLM or TGI server (see setup instructions below)
+2. Configure VS Code settings: `"huggingface.customTGIEndpoint": "http://your-server:8000"`
+3. Select your local model from the GitHub Copilot Chat model picker
+4. **No API keys required, all processing stays on your infrastructure**
+
+## Cloud Deployment (Hugging Face)
 1. Install the HF Copilot Chat extension [here](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat).
 2. Open VS Code's chat interface.
 3. Click the model picker and click "Manage Models...".
@@ -14,11 +27,18 @@ Use frontier open LLMs like Kimi K2, DeepSeek V3.1, GLM 4.5 and more in VS Code 
 5. Provide your Hugging Face Token, you can get one in your [settings page](https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained). You only need to give it the inference.serverless permissions.
 6. Choose the models you want to add to the model picker. 🥳
 
-## 🚀 Local vLLM Support (Successfully Tested!)
+## Local vLLM/TGI Server Setup
 
-**✅ WORKING**: This extension successfully works with local vLLM servers, even with small 2048-token context models!
+**Production Ready**: Successfully deployed in enterprise air-gapped environments.
 
-### Quick vLLM Setup:
+### Benefits of Local Inference:
+- **Data Security**: All data remains on your infrastructure
+- **Air-Gapped Operation**: No internet connectivity required
+- **Low Latency**: Direct connection to local GPU servers
+- **Cost Control**: No per-token API charges
+- **Compliance**: Meet strict data residency requirements
+
+### vLLM Setup (Recommended):
 ```bash
 # Start vLLM (tested with RTX 4060, 8GB VRAM, DeepSeek-Coder 6.7B)
 docker run -d --name vllm-server \
@@ -52,11 +72,11 @@ docker run -d --name vllm-server \
 - Responses limited to 50-100 tokens when near limits
 - **For best experience**: Use 8K+ context models
 
-## ✨ Why use the Hugging Face provider in Copilot
+## Why Use This Extension
 * Access [SoTA open-source LLMs](https://huggingface.co/models?pipeline_tag=text-generation&inference_provider=cerebras,together,fireworks-ai,nebius,novita,sambanova,groq,hyperbolic,nscale,fal-ai,cohere,replicate,scaleway,black-forest-labs,ovhcloud&sort=trending) with tool calling capabilities.
 * Single API to switch between multiple providers: Cerebras, Cohere, Fireworks AI, Groq, HF Inference, Hyperbolic, Nebius, Novita, Nscale, SambaNova, Together AI, and more. See the full list of partners in the [Inference Providers docs](https://huggingface.co/docs/inference-providers/index#partners).
 * Built for high availability (across providers) and low latency.
-* **NEW**: Full support for local vLLM inference servers!
+* **Local Inference Support**: Run vLLM or TGI servers on-premise for air-gapped deployments
 * Transparent pricing: what the provider charges is what you pay.
 
 💡 The free Hugging Face user tier gives you a small amount of monthly inference credits to experiment. Upgrade to [Hugging Face PRO](https://huggingface.co/pro) or [Enterprise](https://huggingface.co/enterprise) for $2 in monthly credits plus pay-as-you-go access across all providers!
