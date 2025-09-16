@@ -72,7 +72,9 @@
 		"lint": "eslint",
 		"format": "prettier --write .",
 		"watch": "tsc -watch -p ./",
-		"test": "pnpm run compile && vscode-test"
+		"test": "pnpm run compile && vscode-test",
+		"package": "npm run compile && npx @vscode/vsce package",
+		"release": "npm run package && cp huggingface-vscode-chat-*.vsix releases/ && cp releases/huggingface-vscode-chat-0.0.5.vsix releases/huggingface-vscode-chat-latest.vsix"
 	},
 	"dependencies": {},
 	"devDependencies": {
