@@ -141,6 +141,61 @@ glab issue close 123
 glab issue reopen 123
 ```
 
+### Issue Labeling and Updates
+
+```bash
+# Create issue with labels (during creation)
+glab issue create --title "Bug fix" --label "bug,urgent,on-prem1"
+
+# Update existing issue labels (NOT glab issue edit - that doesn't exist!)
+glab issue update 123 --label "state::in progress"
+glab issue update 123 --label "priority::high"
+
+# Remove labels
+glab issue update 123 --unlabel "old-label"
+
+# Common mistake: trying to use 'edit' command
+# ❌ glab issue edit 123 --label "new-label"  # This fails!
+# ✅ glab issue update 123 --label "new-label"  # This works!
+```
+
+### Creating Complex Issues with Detailed Content
+
+```bash
+# Use HEREDOC for complex, formatted descriptions
+glab issue create --title "Complex Technical Implementation" \
+  --assignee @me --label "epic,on-prem1" \
+  --description "$(cat <<'EOF'
+## Epic Implementation: Technical Deep Dive
+
+### Background
+Comprehensive technical work including:
+- Multi-file analysis and documentation
+- Performance benchmarking results
+- Integration testing across platforms
+
+### Implementation Details
+#### Phase 1: Research
+- File: `analysis/2025-09-16/technical-analysis.md`
+- Performance metrics: 40-70 tokens/sec
+- Hardware compatibility: RTX 3060-4090
+
+#### Phase 2: Production
+- Docker deployment with required parameters
+- Scripts: `start-service.sh`, `test-endpoints.sh`
+- Zero external dependencies confirmed
+
+### Success Criteria
+✅ Performance targets met
+✅ Documentation complete
+✅ Production deployment ready
+
+**Repository**: https://github.com/user/project
+**Status**: COMPLETE
+EOF
+)"
+```
+
 ## Merge Requests (GitLab's Pull Requests)
 
 ### Listing Merge Requests
@@ -362,6 +417,51 @@ glab issue list -R DevOps/apps/project-name
 # Problem: Permission denied
 # Solution: Check your access level to the project
 glab api projects/123/members
+```
+
+### Board Visibility Issues
+
+```bash
+# Problem: Issues not appearing on GitLab boards despite having some labels
+# Root Cause: Boards filter by ALL required labels - missing ANY label hides the issue
+
+# Debug: Check exact labels on an issue
+glab issue view 123 --output json | grep -A5 '"labels"'
+
+# Compare working vs non-working issues
+glab issue view 33 --output json   # Working issue
+glab issue view 42 --output json   # Check what's missing
+
+# Solution: Add missing labels (common missing label: state::in progress)
+glab issue update 42 --label "state::in progress"
+glab issue update 43 --label "state::in progress"
+
+# Verify all required labels are present
+glab issue list --assignee @me --label "on-prem1"
+# Should now show all issues with both 'on-prem1' AND 'state::in progress' labels
+```
+
+### JSON Debugging Techniques
+
+```bash
+# Get complete issue metadata for debugging
+glab issue view 123 --output json
+
+# Extract specific fields
+glab issue view 123 --output json | jq '.labels[]'
+glab issue view 123 --output json | jq '.assignees[].username'
+glab issue view 123 --output json | jq '.milestone.title'
+
+# Compare issues to find differences
+glab issue view 33 --output json > working-issue.json
+glab issue view 42 --output json > problem-issue.json
+diff working-issue.json problem-issue.json
+
+# Check project-level settings
+glab api projects/55809 | jq '.visibility, .issues_enabled, .merge_requests_enabled'
+
+# Verify board configuration (if accessible)
+glab api projects/55809/boards
 ```
 
 ## Environment Setup Best Practices
