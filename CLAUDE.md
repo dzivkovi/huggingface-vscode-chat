@@ -167,3 +167,28 @@ scripts/rebuild-extension.sh
 - Releases use GitHub Actions workflow triggered on `release/**` branches
 - Version in package.json must match branch tag
 - Automated VSIX packaging and VS Code Marketplace publishing
+
+## GitLab CLI (GLAB) Reference
+
+**For GitLab issue and pipeline management, see comprehensive documentation:**
+
+```bash
+# Quick reference - view the complete GLAB guide
+cat .claude/GLAB.md
+```
+
+**Essential GLAB commands for this project:**
+- `GITLAB_HOST=<your-instance> glab issue list --assignee @me --label "on-prem1"` - View your assigned tickets
+- `glab issue view <issue-number> -R <group/project>` - View issue details
+- `glab mr list --assignee @me` - List your merge requests
+- `glab ci list` - View pipeline status
+- `glab auth status` - Check authentication status
+
+**Authentication for self-hosted GitLab:**
+```bash
+# Set up authentication for enterprise GitLab instances
+glab config set gitlab_host your-gitlab-instance.com
+glab auth login --hostname your-gitlab-instance.com --token YOUR_TOKEN
+```
+
+**Note:** The `.claude/GLAB.md` file contains comprehensive mappings from GitHub CLI to GitLab CLI, troubleshooting guides, and enterprise authentication patterns. Reference this file when working with GitLab repositories, issues, merge requests, and CI/CD pipelines.
