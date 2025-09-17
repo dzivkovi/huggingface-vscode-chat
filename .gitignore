@@ -13,3 +13,4 @@ data/
 .ollama/
 
 .claude/settings.local.json
+tmp/settings.json
