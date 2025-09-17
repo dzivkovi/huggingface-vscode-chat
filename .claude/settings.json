@@ -12,9 +12,23 @@
       "Bash(gh project delete:*)",
       "Bash(gh release delete:*)",
       "Bash(gh secret:*)",
-      "Bash(gh auth token:*)"
+      "Bash(gh auth token:*)",
+      "Bash(git clean:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -r:*)"
     ],
-    "ask": []
+    "ask": [
+      "Bash(git stash drop:*)",
+      "Bash(git rebase:*)",
+      "Bash(git merge:*)",
+      "Bash(git reset:*)",
+      "Bash(git push origin --delete:*)",
+      "Bash(git branch -d:*)",
+      "Bash(git tag -d:*)"
+    ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
