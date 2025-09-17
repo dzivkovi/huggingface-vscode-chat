@@ -196,6 +196,40 @@ EOF
 )"
 ```
 
+### Issue Closing Workflows
+
+```bash
+# WRONG: Trying to close with comment in one command
+# ❌ glab issue close 123 --comment "Completion message"  # This flag doesn't exist!
+
+# CORRECT: Comment first, then close
+# ✅ glab issue comment 123 --message "Completion summary with deliverables"
+# ✅ glab issue close 123
+
+# Professional issue closure with detailed completion summary
+glab issue comment 123 --message "$(cat <<'EOF'
+## Project Complete ✅
+
+### All Acceptance Criteria Met
+- Performance targets achieved: 40-70 tokens/sec
+- Documentation complete: analysis/2025-09-16/
+- Production deployment ready
+
+### Deliverables
+- Repository: https://github.com/user/project
+- Release: v1.0.0-ready
+- Scripts: scripts/deployment/
+
+**Status**: COMPLETE - All requirements exceeded
+EOF
+)"
+glab issue close 123
+
+# Simple completion
+glab issue comment 456 --message "Bug fixed and tested ✅"
+glab issue close 456
+```
+
 ## Merge Requests (GitLab's Pull Requests)
 
 ### Listing Merge Requests
