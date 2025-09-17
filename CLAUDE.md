@@ -178,17 +178,35 @@ cat .claude/GLAB.md
 ```
 
 **Essential GLAB commands for this project:**
-- `GITLAB_HOST=<your-instance> glab issue list --assignee @me --label "on-prem1"` - View your assigned tickets
-- `glab issue view <issue-number> -R <group/project>` - View issue details
-- `glab mr list --assignee @me` - List your merge requests
-- `glab ci list` - View pipeline status
-- `glab auth status` - Check authentication status
+```bash
+# Project-specific issue management
+GITLAB_HOST=gitlab.industrysoftware.automation.siemens.com glab issue list --assignee @me --label "on-prem1"
+glab issue view <issue-number> -R DevOps/apps/codesentinel-lite
+
+# CRITICAL: Use update for labels (NOT edit) - prevents common failures
+glab issue update <id> --label "state::in progress"
+
+# CRITICAL: Comment first, then close (no --comment flag exists)
+glab issue comment <id> --message "Completion summary"
+glab issue close <id>
+
+# Debug board visibility issues
+glab issue view <id> --output json | grep -A5 '"labels"'
+
+# Other essential commands
+glab mr list --assignee @me                     # List merge requests
+glab ci list                                    # View pipeline status
+glab auth status                                # Check authentication
+```
 
 **Authentication for self-hosted GitLab:**
 ```bash
-# Set up authentication for enterprise GitLab instances
-glab config set gitlab_host your-gitlab-instance.com
+# Most reliable enterprise pattern
+export GITLAB_HOST=your-gitlab-instance.com
 glab auth login --hostname your-gitlab-instance.com --token YOUR_TOKEN
+
+# Per-command override (alternative)
+GITLAB_HOST=your-gitlab-instance.com glab issue list --assignee @me
 ```
 
 **Note:** The `.claude/GLAB.md` file contains comprehensive mappings from GitHub CLI to GitLab CLI, troubleshooting guides, and enterprise authentication patterns. Reference this file when working with GitLab repositories, issues, merge requests, and CI/CD pipelines.
