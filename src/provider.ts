@@ -54,7 +54,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	// Optional vLLM/local inference endpoint from VS Code settings
 	private _localEndpoint: string | undefined;
 	// Cache for model context limits
-	private _modelContextLimits: Map<string, number> = new Map();
+	private _modelContextLimits = new Map<string, number>();
 
 	/**
 	 * Create a provider using the given secret storage for the API key.
@@ -107,11 +107,16 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	): Promise<LanguageModelChatInformation[]> {
 		const infos: LanguageModelChatInformation[] = [];
 
-		// Add local inference models if configured
+		// LOCAL MODELS: If local endpoint is configured, fetch local models
 		if (this._localEndpoint) {
+			logger.info(`Fetching models from local endpoint: ${this._localEndpoint}`);
+
 			// Fetch available models from local inference endpoint
 			try {
 				const localModels = await this.fetchLocalModels(this._localEndpoint);
+				if (localModels.length > 0) {
+					logger.info(`Found ${localModels.length} local model(s)`);
+				}
 				for (const model of localModels) {
 					const hostname = new URL(this._localEndpoint).hostname;
 					const modelId = `local|${this._localEndpoint}|${model}`;
@@ -139,8 +144,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					} satisfies LanguageModelChatInformation);
 				}
 			} catch (e) {
-				// If we can't fetch models, add a generic local inference entry
+				// Show user notification about local endpoint failure
+				const errorMsg = e instanceof Error ? e.message : String(e);
 				logger.error("Failed to fetch local models", e);
+
+				// Show warning to user
+				vscode.window.showWarningMessage(
+					`Local inference endpoint (${this._localEndpoint}) is not responding. Please check if your local server is running. Error: ${errorMsg}`,
+					'OK', 'Configure Endpoint'
+				).then(selection => {
+					if (selection === 'Configure Endpoint') {
+						vscode.commands.executeCommand('workbench.action.openSettings', 'huggingface.customTGIEndpoint');
+					}
+				});
+
+				// Still add a generic entry so user can attempt to use it
 				const hostname = this._localEndpoint.replace(/^https?:\/\//, '').split('/')[0];
 				const modelId = `local|${this._localEndpoint}|default`;
 
@@ -153,8 +171,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 				infos.push({
 					id: modelId,
-					name: `vLLM @ ${hostname}`,
-					tooltip: `vLLM server at ${this._localEndpoint} (${contextLimit} token context)`,
+					name: `vLLM @ ${hostname} (unreachable)`,
+					tooltip: `WARNING: Server at ${this._localEndpoint} is not responding (${contextLimit} token context)`,
 					family: "huggingface",
 					version: "1.0.0",
 					maxInputTokens,
@@ -165,17 +183,31 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					},
 				} satisfies LanguageModelChatInformation);
 			}
+
+			// Store local model endpoints for chat handling
+			this._chatEndpoints = infos.map((info) => ({
+				model: info.id,
+				modelMaxPromptTokens: info.maxInputTokens + info.maxOutputTokens,
+			}));
+
+			logger.info(`Added ${infos.length} local model(s) to the list`);
 		}
+
+		// HF CLOUD MODELS: Fetch HF models if API key is available
 
 		// Fetch HF Router models if API key is available
 		const apiKey = await this.ensureApiKey(options.silent);
 		if (!apiKey) {
-			return infos; // Return local model only if no API key
+			logger.info(`No HF API key available - returning ${infos.length} local model(s) only`);
+			return infos; // Return local models only if no API key
 		}
 
-		const { models } = await this.fetchModels(apiKey);
+		logger.info("Fetching HF cloud models...");
 
-		const hfInfos: LanguageModelChatInformation[] = models.flatMap((m) => {
+		try {
+			const { models } = await this.fetchModels(apiKey);
+
+			const hfInfos: LanguageModelChatInformation[] = models.flatMap((m) => {
 			const providers = m?.providers ?? [];
 			const modalities = m.architecture?.input_modalities ?? [];
 			const vision = Array.isArray(modalities) && modalities.includes("image");
@@ -224,15 +256,24 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			return entries;
-		});
+			});
 
+			// Add HF Router models to the list
+			infos.push(...hfInfos);
+		} catch (error) {
+			logger.error("Failed to fetch HF cloud models, but local models are still available", error);
+			// Continue with local models only - don't throw the error
+		}
+
+		// Update chat endpoints to include whatever models we have (local, cloud, or both)
 		this._chatEndpoints = infos.map((info) => ({
 			model: info.id,
 			modelMaxPromptTokens: info.maxInputTokens + info.maxOutputTokens,
 		}));
 
-		// Add HF Router models to the list
-		infos.push(...hfInfos);
+		const localCount = this._localEndpoint ? infos.filter(i => i.id.startsWith('local|')).length : 0;
+		const cloudCount = infos.length - localCount;
+		logger.info(`Returning ${infos.length} total model(s): ${localCount} local, ${cloudCount} cloud`);
 
 		return infos;
 	}
