@@ -58,6 +58,41 @@
 					"type": "string",
 					"default": "http://hlo-codesentinel.wv.mentorg.com:8443",
 					"description": "Optional: Custom TGI/vLLM server endpoint. Default: http://hlo-codesentinel.wv.mentorg.com:8443 (Siemens team server). Clear this field to use only HuggingFace cloud models."
+				},
+				"huggingface.tokenAllocation.inputRatio": {
+					"type": "number",
+					"default": 0.65,
+					"minimum": 0.1,
+					"maximum": 0.9,
+					"description": "Ratio of context allocated for input tokens (0.1-0.9). Default: 0.65"
+				},
+				"huggingface.tokenAllocation.outputRatio": {
+					"type": "number",
+					"default": 0.15,
+					"minimum": 0.05,
+					"maximum": 0.5,
+					"description": "Ratio of context allocated for output tokens (0.05-0.5). Default: 0.15"
+				},
+				"huggingface.tokenAllocation.minimumOutput": {
+					"type": "number",
+					"default": 100,
+					"minimum": 50,
+					"maximum": 1000,
+					"description": "Minimum tokens always reserved for output (50-1000). Default: 100"
+				},
+				"huggingface.timeouts.localHealthCheck": {
+					"type": "number",
+					"default": 5000,
+					"minimum": 1000,
+					"maximum": 30000,
+					"description": "Timeout for local server health checks in milliseconds (1000-30000). Default: 5000"
+				},
+				"huggingface.timeouts.localModelFetch": {
+					"type": "number",
+					"default": 5000,
+					"minimum": 1000,
+					"maximum": 30000,
+					"description": "Timeout for fetching models from local server in milliseconds (1000-30000). Default: 5000"
 				}
 			}
 		}

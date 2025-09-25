@@ -18,15 +18,14 @@ const BASE_URL = "https://router.huggingface.co/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 
-// Token allocation constants for vLLM
-const TOKEN_ALLOCATION = {
+// Default values for configuration (fallback if not configured)
+const DEFAULT_TOKEN_ALLOCATION = {
 	INPUT_RATIO: 0.65,
 	OUTPUT_RATIO: 0.15,
 	MINIMUM_OUTPUT: 100
 };
 
-// Network timeouts (configurable via settings in future)
-const TIMEOUTS = {
+const DEFAULT_TIMEOUTS = {
 	LOCAL_HEALTH_CHECK: 5000,
 	LOCAL_MODEL_FETCH: 5000
 };
@@ -102,6 +101,29 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		}
 	}
 
+	/**
+	 * Get token allocation configuration from VS Code settings
+	 */
+	private getTokenAllocation() {
+		const config = vscode.workspace.getConfiguration('huggingface');
+		return {
+			INPUT_RATIO: config.get<number>('tokenAllocation.inputRatio') ?? DEFAULT_TOKEN_ALLOCATION.INPUT_RATIO,
+			OUTPUT_RATIO: config.get<number>('tokenAllocation.outputRatio') ?? DEFAULT_TOKEN_ALLOCATION.OUTPUT_RATIO,
+			MINIMUM_OUTPUT: config.get<number>('tokenAllocation.minimumOutput') ?? DEFAULT_TOKEN_ALLOCATION.MINIMUM_OUTPUT
+		};
+	}
+
+	/**
+	 * Get timeout configuration from VS Code settings
+	 */
+	private getTimeouts() {
+		const config = vscode.workspace.getConfiguration('huggingface');
+		return {
+			LOCAL_HEALTH_CHECK: config.get<number>('timeouts.localHealthCheck') ?? DEFAULT_TIMEOUTS.LOCAL_HEALTH_CHECK,
+			LOCAL_MODEL_FETCH: config.get<number>('timeouts.localModelFetch') ?? DEFAULT_TIMEOUTS.LOCAL_MODEL_FETCH
+		};
+	}
+
 	/** Roughly estimate tokens for VS Code chat messages (text only) */
 	private estimateMessagesTokens(msgs: readonly vscode.LanguageModelChatMessage[]): number {
 		let total = 0;
@@ -157,8 +179,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					// CRITICAL: vLLM adds ~400-500 tokens for chat template formatting!
 					// We must be VERY conservative to avoid "token limit exceeded" errors
 					// For 2048 context: 2048 - 500 (template) - 200 (output) = 1348 safe input
-					const maxInputTokens = Math.floor(contextLimit * TOKEN_ALLOCATION.INPUT_RATIO);
-					const maxOutputTokens = Math.floor(contextLimit * TOKEN_ALLOCATION.OUTPUT_RATIO);
+					const tokenAllocation = this.getTokenAllocation();
+					const maxInputTokens = Math.floor(contextLimit * tokenAllocation.INPUT_RATIO);
+					const maxOutputTokens = Math.floor(contextLimit * tokenAllocation.OUTPUT_RATIO);
 
 					infos.push({
 						id: modelId,
@@ -324,7 +347,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private async checkLocalHealth(endpoint: string): Promise<{ healthy: boolean; reason?: string }> {
 		try {
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), TIMEOUTS.LOCAL_HEALTH_CHECK);
+			const timeouts = this.getTimeouts();
+			const timeoutId = setTimeout(() => controller.abort(), timeouts.LOCAL_HEALTH_CHECK);
 
 			const healthUrl = endpoint.endsWith('/') ? `${endpoint}health` : `${endpoint}/health`;
 			const response = await fetch(healthUrl, {
@@ -397,7 +421,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private async fetchLocalModels(endpoint: string): Promise<string[]> {
 		try {
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), TIMEOUTS.LOCAL_MODEL_FETCH);
+			const timeouts = this.getTimeouts();
+			const timeoutId = setTimeout(() => controller.abort(), timeouts.LOCAL_MODEL_FETCH);
 
 			const modelsUrl = endpoint.endsWith('/') ? `${endpoint}v1/models` : `${endpoint}/v1/models`;
 			const response = await fetch(modelsUrl, {
