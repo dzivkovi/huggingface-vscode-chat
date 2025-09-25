@@ -22,6 +22,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Fact-check technical claims, especially comparisons
 - Document systematic analysis for future reference
 
+## CRITICAL: Development Workflow Principles
+
+**Parallel Task Execution:**
+IMPORTANT: Always use parallel execution via the Task tool when possible. Examples of parallelizable tasks:
+- Running `npm test` and `npm run lint` concurrently
+- Analyzing TypeScript files across different modules simultaneously
+- Testing multiple VS Code extension scenarios in parallel
+- Searching for patterns across source directories concurrently
+- Validating multiple configuration files at once
+
+This improves performance significantly and should be the default approach for independent operations.
+
+## CRITICAL: Important Rules
+
+**Git Commit Guidelines:**
+- **NEVER use `git add` or `git commit` without explicit user request**
+- **NEVER sign commits or changes as Claude/AI** - use standard git authorship only
+- Only commit when user explicitly asks: "commit this", "git add", "create a commit", etc.
+- Default behavior: Make changes but DO NOT stage or commit them
+
+**Content Guidelines:**
+- **NEVER use emojis in any files or documentation unless explicitly requested by the User**
+- Keep all content professional and emoji-free by default
+
 ## CRITICAL: Test-Driven Development (TDD) Requirements
 
 **⚠️ MANDATORY: ALL changes MUST follow strict TDD practices:**
