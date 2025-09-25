@@ -83,8 +83,10 @@ suite("Local-Only Mode Without HF Key", () => {
 						json: async () => ({
 							data: [
 								{
-									id: "local-model-1",
-									max_model_len: 4096
+									id: "deepseek-coder-6.7b-instruct",
+									max_model_len: 4096,
+									owned_by: "local",
+									created: Date.now()
 								}
 							]
 						})
@@ -138,8 +140,10 @@ suite("Local-Only Mode Without HF Key", () => {
 						json: async () => ({
 							data: [
 								{
-									id: "local-model-1",
-									max_model_len: 4096
+									id: "deepseek-coder-6.7b-instruct",
+									max_model_len: 4096,
+									owned_by: "local",
+									created: Date.now()
 								}
 							]
 						})
