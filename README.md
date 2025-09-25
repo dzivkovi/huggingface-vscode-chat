@@ -23,6 +23,8 @@
 This VS Code extension enables GitHub Copilot Chat to work with:
 - **Local inference servers** (vLLM/TGI) for secure, air-gapped environments
 - **Hugging Face Inference Providers** for cloud-based models (Kimi K2, DeepSeek V3.1, GLM 4.5, and more)
+- **Hybrid mode**: Use both local and cloud models simultaneously (v0.0.6+)
+- **Error resilient**: Local models remain available even if HF authentication fails (v0.0.6+)
 
 ---
 
@@ -32,8 +34,10 @@ For secure, on-premise environments where data cannot leave your network:
 
 1. Start your local vLLM or TGI server (see setup instructions below)
 2. Configure VS Code settings: `"huggingface.customTGIEndpoint": "http://your-server:8000"`
+   - Default for Siemens team: `http://hlo-codesentinel.wv.mentorg.com:8443`
 3. Select your local model from the GitHub Copilot Chat model picker
 4. **No API keys required, all processing stays on your infrastructure**
+5. **New in v0.0.6**: Local models remain available even if HF cloud authentication fails
 
 ![Air-Gapped vLLM Inference](./assets/air-gapped-vLLM-inference.png)
 
