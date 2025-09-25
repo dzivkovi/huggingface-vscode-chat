@@ -18,6 +18,18 @@ const BASE_URL = "https://router.huggingface.co/v1";
 const DEFAULT_MAX_OUTPUT_TOKENS = 16000;
 const DEFAULT_CONTEXT_LENGTH = 128000;
 
+// Default values for configuration (fallback if not configured)
+const DEFAULT_TOKEN_ALLOCATION = {
+	INPUT_RATIO: 0.65,
+	OUTPUT_RATIO: 0.15,
+	MINIMUM_OUTPUT: 100
+};
+
+const DEFAULT_TIMEOUTS = {
+	LOCAL_HEALTH_CHECK: 5000,
+	LOCAL_MODEL_FETCH: 5000
+};
+
 /**
  * VS Code Chat provider backed by Hugging Face Inference Providers.
  */
@@ -54,7 +66,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	// Optional vLLM/local inference endpoint from VS Code settings
 	private _localEndpoint: string | undefined;
 	// Cache for model context limits
-	private _modelContextLimits: Map<string, number> = new Map();
+	private _modelContextLimits = new Map<string, number>();
 
 	/**
 	 * Create a provider using the given secret storage for the API key.
@@ -67,8 +79,49 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 		// Trim whitespace to avoid URL parsing issues
 		this._localEndpoint = endpoint?.trim();
 		if (this._localEndpoint) {
-			logger.info(`Local inference endpoint configured: ${this._localEndpoint}`);
+			// Validate endpoint URL
+			if (this.validateEndpoint(this._localEndpoint)) {
+				logger.info(`Local inference endpoint configured: ${this._localEndpoint}`);
+			} else {
+				logger.warn(`Invalid local endpoint URL: ${this._localEndpoint}`);
+				this._localEndpoint = undefined;
+			}
 		}
+	}
+
+	/**
+	 * Validate endpoint URL format
+	 */
+	private validateEndpoint(endpoint: string): boolean {
+		try {
+			new URL(endpoint);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * Get token allocation configuration from VS Code settings
+	 */
+	private getTokenAllocation() {
+		const config = vscode.workspace.getConfiguration('huggingface');
+		return {
+			INPUT_RATIO: config.get<number>('tokenAllocation.inputRatio') ?? DEFAULT_TOKEN_ALLOCATION.INPUT_RATIO,
+			OUTPUT_RATIO: config.get<number>('tokenAllocation.outputRatio') ?? DEFAULT_TOKEN_ALLOCATION.OUTPUT_RATIO,
+			MINIMUM_OUTPUT: config.get<number>('tokenAllocation.minimumOutput') ?? DEFAULT_TOKEN_ALLOCATION.MINIMUM_OUTPUT
+		};
+	}
+
+	/**
+	 * Get timeout configuration from VS Code settings
+	 */
+	private getTimeouts() {
+		const config = vscode.workspace.getConfiguration('huggingface');
+		return {
+			LOCAL_HEALTH_CHECK: config.get<number>('timeouts.localHealthCheck') ?? DEFAULT_TIMEOUTS.LOCAL_HEALTH_CHECK,
+			LOCAL_MODEL_FETCH: config.get<number>('timeouts.localModelFetch') ?? DEFAULT_TIMEOUTS.LOCAL_MODEL_FETCH
+		};
 	}
 
 	/** Roughly estimate tokens for VS Code chat messages (text only) */
@@ -107,11 +160,16 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	): Promise<LanguageModelChatInformation[]> {
 		const infos: LanguageModelChatInformation[] = [];
 
-		// Add local inference models if configured
+		// LOCAL MODELS: If local endpoint is configured, fetch local models
 		if (this._localEndpoint) {
+			logger.info(`Fetching models from local endpoint: ${this._localEndpoint}`);
+
 			// Fetch available models from local inference endpoint
 			try {
 				const localModels = await this.fetchLocalModels(this._localEndpoint);
+				if (localModels.length > 0) {
+					logger.info(`Found ${localModels.length} local model(s)`);
+				}
 				for (const model of localModels) {
 					const hostname = new URL(this._localEndpoint).hostname;
 					const modelId = `local|${this._localEndpoint}|${model}`;
@@ -121,8 +179,9 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					// CRITICAL: vLLM adds ~400-500 tokens for chat template formatting!
 					// We must be VERY conservative to avoid "token limit exceeded" errors
 					// For 2048 context: 2048 - 500 (template) - 200 (output) = 1348 safe input
-					const maxInputTokens = Math.floor(contextLimit * 0.65);  // ~1330 tokens for 2048 context
-					const maxOutputTokens = Math.floor(contextLimit * 0.15); // ~307 tokens for output
+					const tokenAllocation = this.getTokenAllocation();
+					const maxInputTokens = Math.floor(contextLimit * tokenAllocation.INPUT_RATIO);
+					const maxOutputTokens = Math.floor(contextLimit * tokenAllocation.OUTPUT_RATIO);
 
 					infos.push({
 						id: modelId,
@@ -139,8 +198,21 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					} satisfies LanguageModelChatInformation);
 				}
 			} catch (e) {
-				// If we can't fetch models, add a generic local inference entry
-				logger.error("Failed to fetch local models", e);
+				// Show user notification about local endpoint failure
+				const errorMsg = e instanceof Error ? e.message : String(e);
+				logger.error(`Failed to fetch local models from ${this._localEndpoint}: ${errorMsg}`, e);
+
+				// Show warning to user
+				vscode.window.showWarningMessage(
+					`Local inference endpoint (${this._localEndpoint}) is not responding. Please check if your local server is running. Error: ${errorMsg}`,
+					'OK', 'Configure Endpoint'
+				).then(selection => {
+					if (selection === 'Configure Endpoint') {
+						vscode.commands.executeCommand('workbench.action.openSettings', 'huggingface.customTGIEndpoint');
+					}
+				});
+
+				// Still add a generic entry so user can attempt to use it
 				const hostname = this._localEndpoint.replace(/^https?:\/\//, '').split('/')[0];
 				const modelId = `local|${this._localEndpoint}|default`;
 
@@ -153,8 +225,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 				infos.push({
 					id: modelId,
-					name: `vLLM @ ${hostname}`,
-					tooltip: `vLLM server at ${this._localEndpoint} (${contextLimit} token context)`,
+					name: `vLLM @ ${hostname} (unreachable)`,
+					tooltip: `WARNING: Server at ${this._localEndpoint} is not responding (${contextLimit} token context)`,
 					family: "huggingface",
 					version: "1.0.0",
 					maxInputTokens,
@@ -165,17 +237,31 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					},
 				} satisfies LanguageModelChatInformation);
 			}
+
+			// Store local model endpoints for chat handling
+			this._chatEndpoints = infos.map((info) => ({
+				model: info.id,
+				modelMaxPromptTokens: info.maxInputTokens + info.maxOutputTokens,
+			}));
+
+			logger.info(`Added ${infos.length} local model(s) to the list`);
 		}
+
+		// HF CLOUD MODELS: Fetch HF models if API key is available
 
 		// Fetch HF Router models if API key is available
 		const apiKey = await this.ensureApiKey(options.silent);
 		if (!apiKey) {
-			return infos; // Return local model only if no API key
+			logger.info(`No HF API key available - returning ${infos.length} local model(s) only`);
+			return infos; // Return local models only if no API key
 		}
 
-		const { models } = await this.fetchModels(apiKey);
+		logger.info("Fetching HF cloud models...");
 
-		const hfInfos: LanguageModelChatInformation[] = models.flatMap((m) => {
+		try {
+			const { models } = await this.fetchModels(apiKey);
+
+			const hfInfos: LanguageModelChatInformation[] = models.flatMap((m) => {
 			const providers = m?.providers ?? [];
 			const modalities = m.architecture?.input_modalities ?? [];
 			const vision = Array.isArray(modalities) && modalities.includes("image");
@@ -224,15 +310,24 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			}
 
 			return entries;
-		});
+			});
 
+			// Add HF Router models to the list
+			infos.push(...hfInfos);
+		} catch (error) {
+			logger.error("Failed to fetch HF cloud models, but local models are still available", error);
+			// Continue with local models only - don't throw the error
+		}
+
+		// Update chat endpoints to include whatever models we have (local, cloud, or both)
 		this._chatEndpoints = infos.map((info) => ({
 			model: info.id,
 			modelMaxPromptTokens: info.maxInputTokens + info.maxOutputTokens,
 		}));
 
-		// Add HF Router models to the list
-		infos.push(...hfInfos);
+		const localCount = this._localEndpoint ? infos.filter(i => i.id.startsWith('local|')).length : 0;
+		const cloudCount = infos.length - localCount;
+		logger.info(`Returning ${infos.length} total model(s): ${localCount} local, ${cloudCount} cloud`);
 
 		return infos;
 	}
@@ -252,7 +347,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private async checkLocalHealth(endpoint: string): Promise<{ healthy: boolean; reason?: string }> {
 		try {
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for health check
+			const timeouts = this.getTimeouts();
+			const timeoutId = setTimeout(() => controller.abort(), timeouts.LOCAL_HEALTH_CHECK);
 
 			const healthUrl = endpoint.endsWith('/') ? `${endpoint}health` : `${endpoint}/health`;
 			const response = await fetch(healthUrl, {
@@ -325,7 +421,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	private async fetchLocalModels(endpoint: string): Promise<string[]> {
 		try {
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+			const timeouts = this.getTimeouts();
+			const timeoutId = setTimeout(() => controller.abort(), timeouts.LOCAL_MODEL_FETCH);
 
 			const modelsUrl = endpoint.endsWith('/') ? `${endpoint}v1/models` : `${endpoint}/v1/models`;
 			const response = await fetch(modelsUrl, {
