@@ -33,17 +33,14 @@ code .
 **All contributions MUST follow TDD:**
 
 ```bash
-# 1. Write failing test
-# 2. Run test to confirm failure
-npm run test
+# 1. Write failing test first
+# 2. Run: npm run test  (confirm it fails ❌)
 
 # 3. Write minimal code to pass
-# 4. Run test to confirm success
-npm run test
+# 4. Run: npm run test  (confirm it passes ✓)
 
 # 5. Refactor if needed
-# 6. Run ALL tests before submitting
-npm run test
+# 6. Run: npm run test  (ensure all tests still pass ✓✓)
 ```
 
 ### VS Code Extension Development
@@ -68,11 +65,12 @@ npm run package    # Create VSIX for testing
 For changes affecting local inference:
 
 ```bash
-# Start local vLLM server (if you have GPU)
+# Start local vLLM server (requires NVIDIA GPU)
 docker run -d --name vllm-test --gpus all -p 8000:8000 \
   vllm/vllm-openai:latest \
   --model TheBloke/deepseek-coder-6.7B-instruct-AWQ \
-  --quantization awq
+  --quantization awq \
+  --max-model-len 2048
 
 # Test endpoint
 scripts/test-vllm.sh
@@ -87,10 +85,10 @@ scripts/test-vllm.sh
 
 For complex features, use our design template:
 ```bash
-# Create design document
+# Create design document from template
 cp analysis/0000/README.md analysis/0000/DESIGN.md
 # Edit DESIGN.md with your proposal
-# Create issue from design
+# Then run: /issue "Your issue title" (if using Claude Code)
 ```
 
 ### 2. Create Issue
@@ -125,7 +123,7 @@ Use our PR template which focuses on:
 ## 🚫 What NOT to Do
 
 - **Don't** commit without running tests
-- **Don't** add emojis to code/docs (unless requested)
+- **Don't** add emojis to code/docs (unless explicitly requested)
 - **Don't** make large changes without discussion
 - **Don't** mix features in one PR
 - **Don't** skip the TDD workflow
@@ -180,4 +178,4 @@ We are committed to providing a welcoming and inclusive environment. Please:
 
 **Remember**: Quality > Quantity. A well-tested, focused PR is worth more than a large, untested one.
 
-Thank you for contributing to make AI-powered coding accessible to everyone! 🚀
+Thank you for contributing to make AI-powered coding accessible to everyone!
