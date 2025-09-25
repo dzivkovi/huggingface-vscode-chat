@@ -12,5 +12,19 @@ data/
 *.log
 .ollama/
 
+# Claude Code
+CLAUDE.local.md
 .claude/settings.local.json
+
+# work folders
 tmp/
+work/
+
+# temporary conversation files
+analysis/**/2025-*/
+analysis/**/archive/
+
+# starter design docs (later moved to analysis/<issue#>/DESIGN.md)
+analysis/0000/DESIGN*.md
+analysis/0001/DESIGN*.md
+analysis/0002/DESIGN*.md
