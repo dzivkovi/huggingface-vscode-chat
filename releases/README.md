@@ -4,10 +4,18 @@ Download the latest pre-built extension without compilation:
 
 ## 📦 **Quick Download**
 
+### 🎉 New in v0.0.6 (2025-09-25)
+- **Air-gapped support**: Works without HuggingFace API key
+- **Hybrid mode**: Use both local and cloud models simultaneously
+- **Error resilience**: Local models remain available when HF auth fails
+- **Team defaults**: Pre-configured for Siemens team server
+- **User notifications**: Warnings when endpoints are unreachable
+
 | Version | File | Download | Notes |
 |---------|------|----------|-------|
-| **Latest** | `huggingface-vscode-chat-latest.vsix` | [Download](./huggingface-vscode-chat-latest.vsix) | 🔥 Recommended |
-| **v0.0.5** | `huggingface-vscode-chat-0.0.5.vsix` | [Download](./huggingface-vscode-chat-0.0.5.vsix) | Stable release |
+| **Latest** | `huggingface-vscode-chat-latest.vsix` | [Download](./huggingface-vscode-chat-latest.vsix) | 🔥 v0.0.6 - Recommended |
+| **v0.0.6** | `huggingface-vscode-chat-0.0.6.vsix` | [Download](./huggingface-vscode-chat-0.0.6.vsix) | Local inference + Error resilience |
+| **v0.0.5** | `huggingface-vscode-chat-0.0.5.vsix` | [Download](./huggingface-vscode-chat-0.0.5.vsix) | Previous stable |
 
 ## 🚀 **Installation (3 Steps)**
 
