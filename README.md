@@ -34,7 +34,7 @@ For secure, on-premise environments where data cannot leave your network:
 
 1. Start your local vLLM or TGI server (see setup instructions below)
 2. Configure VS Code settings: `"huggingface.customTGIEndpoint": "http://your-server:8000"`
-   - Default for Siemens team: `http://hlo-codesentinel.wv.mentorg.com:8443`
+   - Example enterprise endpoint: `http://your-internal-server:8443`
 3. Select your local model from the GitHub Copilot Chat model picker
 4. **No API keys required, all processing stays on your infrastructure**
 5. **New in v0.0.6**: Local models remain available even if HF cloud authentication fails

@@ -28,3 +28,6 @@ analysis/**/archive/
 analysis/0000/DESIGN*.md
 analysis/0001/DESIGN*.md
 analysis/0002/DESIGN*.md
+
+# MCP Configs for GitHub Copilot
+.vscode/mcp.json
