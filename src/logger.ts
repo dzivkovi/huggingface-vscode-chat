@@ -10,7 +10,7 @@ enum LogLevel {
 class Logger {
     private outputChannel: vscode.OutputChannel;
     private startTime: number;
-    private logLevel: LogLevel = LogLevel.INFO; // Default to INFO level
+    private logLevel: LogLevel = LogLevel.INFO; // INFO level for production (use DEBUG for troubleshooting)
 
     constructor() {
         this.outputChannel = vscode.window.createOutputChannel('Hugging Face Chat Provider');
