@@ -579,6 +579,37 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 					const parsed = parseResult.value as any;
 					const delta = parsed.choices?.[0]?.delta;
+
+					// Check for thinking progress (from original HuggingFace implementation)
+					try {
+						const maybeThinking = (parsed.choices?.[0] as Record<string, unknown> | undefined)?.thinking
+							?? (parsed as Record<string, unknown> | undefined)?.thinking;
+						if (maybeThinking !== undefined) {
+							const vsAny = (vscode as unknown as Record<string, unknown>);
+							const ThinkingCtor = vsAny["LanguageModelThinkingPart"] as
+								| (new (text: string, id?: string, metadata?: unknown) => unknown)
+								| undefined;
+							if (ThinkingCtor) {
+								let text = "";
+								let id: string | undefined;
+								let metadata: unknown;
+								if (maybeThinking && typeof maybeThinking === "object") {
+									const mt = maybeThinking as Record<string, unknown>;
+									text = typeof mt["text"] === "string" ? (mt["text"] as string) : "";
+									id = typeof mt["id"] === "string" ? (mt["id"] as string) : undefined;
+									metadata = mt["metadata"];
+								} else if (typeof maybeThinking === "string") {
+									text = maybeThinking;
+								}
+								if (text) {
+									progress.report(new (ThinkingCtor as new (text: string, id?: string, metadata?: unknown) => unknown)(text, id, metadata) as unknown as vscode.LanguageModelResponsePart);
+								}
+							}
+						}
+					} catch {
+						// ignore errors here temporarily - matches HF original
+					}
+
 					if (delta?.content) {
 						// Process text chunks that might contain embedded tool calls
 						// Report the text content through the progress API (using VS Code API class)
