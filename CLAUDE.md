@@ -22,6 +22,157 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Fact-check technical claims, especially comparisons
 - Document systematic analysis for future reference
 
+## Core Design Principles
+
+### 1. Minimalism Above All
+> **"Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away."**
+> — Antoine de Saint-Exupéry
+
+**Apply this to everything:**
+- **Code**: Remove unnecessary complexity, prefer simple solutions
+- **Tests**: Add the minimum tests that prevent regressions (like our 3-test streaming fix)
+- **Documentation**: Clear and concise beats comprehensive
+- **Features**: Do one thing well rather than many things poorly
+
+### 2. User Interaction First
+**Before implementing ANYTHING, ask: "How will users interact with this?"**
+- Browsing/scanning tasks → Flat layouts, minimize cognitive load
+- Direct navigation tasks → Logical hierarchy acceptable
+- API design → Think of the developer experience first
+- Error messages → What would help the user fix the problem?
+
+### 3. Defensive Programming (Enhanced)
+**Beyond basic validation - expect everything to fail:**
+- Test everything, validate ALL assumptions
+- NEVER rush implementation - "measure 3x, cut 1x"
+- Every external API call needs timeout and error handling
+- Every user input needs validation and sanitization
+- Plan for failures: What happens when the API is down? When types don't match?
+- **TypeScript Example:**
+  ```typescript
+  // WRONG: Trusting external data
+  const name = apiResponse.name;  // Could be undefined, null, number, etc.
+
+  // RIGHT: Defensive validation
+  const name = typeof apiResponse?.name === 'string'
+    ? apiResponse.name.substring(0, 200)  // Also limit length!
+    : 'Unknown';
+  ```
+
+### 4. Documentation-First Development
+**The docs are the source of truth, not your memory:**
+1. **ALWAYS** check latest official docs before implementing
+2. Technology changes faster than training data
+3. When docs conflict with existing code, trust the docs
+4. For this project: Check HuggingFace original implementation first
+
+### 5. Test Philosophy
+**Tests are contracts, not suggestions:**
+- **Tests are immutable**: Once written, tests define success
+- **Implementation serves tests**, not vice versa
+- **TDD for everything**: Write the test first, watch it fail, then implement
+- **Regression tests**: The simplest test that would have caught your bug
+- **For AI/nondeterministic systems**: Run 5+ times for consistency
+
+### 6. Task Planning Guidelines
+**Right-size your approach to the task:**
+- **Complex tasks (3+ steps)**: ALWAYS use TodoWrite to track progress
+- **Simple tasks (1-2 steps)**: Execute directly without todo overhead
+- **Debugging sessions >1 hour**: Create analysis file in `analysis/YYYY-MM-DD/`
+- **When stuck**: Step back, use TodoWrite to break down the problem
+
+### 7. Tool Preferences
+**Use the right tool, prefer the proven one:**
+- **Searching**: ALWAYS use `Grep` tool (uses ripgrep) - NEVER use bash grep/find
+- **File reading**: Use `Read` tool, not cat/head/tail commands
+- **Pattern matching**: Grep tool over complex bash pipelines
+- **Testing**: `npm test` first and often
+
+## CRITICAL: HuggingFace Fork Grounding Rules
+
+**This extension is forked from HuggingFace VS Code Chat. NEVER BREAK WHAT WORKS.**
+
+### The "Measure 3x Cut 1x" Principle
+**BEFORE making ANY changes to existing functionality:**
+1. **FIRST**: Check the original HuggingFace implementation at https://github.com/huggingface/huggingface-vscode-chat
+2. **SECOND**: Understand why they implemented it that way
+3. **THIRD**: Test your assumptions against the original
+4. **ONLY THEN**: Make your change
+
+### Hard-Learned Lessons from Painful Debugging (2025-09-27)
+
+**What Went Wrong (So You Never Repeat It):**
+
+1. **The AbortSignal Disaster**
+   - **WRONG**: `signal: token as any` - NEVER use `as any` to bypass TypeScript!
+   - **WRONG**: Adding AbortController when HF doesn't use it
+   - **RIGHT**: Match HF exactly - they don't pass signal parameter at all
+   ```typescript
+   // HuggingFace original (WORKS):
+   const response = await fetch(requestUrl, {
+       method: "POST",
+       headers,
+       body: JSON.stringify(requestBody)
+       // NO signal parameter!
+   });
+   ```
+
+2. **The Progress Reporting Failure**
+   - **WRONG**: `progress.report({ content: delta.content })`
+   - **WRONG**: `progress.report({ text: delta.content })`
+   - **RIGHT**: Use VS Code API classes EXACTLY like HF does:
+   ```typescript
+   // ALWAYS use VS Code API classes:
+   progress.report(new vscode.LanguageModelTextPart(text));
+   progress.report(new vscode.LanguageModelToolCallPart(id, name, args));
+   ```
+
+3. **Missing Features (Thinking Support)**
+   - When HF has a feature we don't, copy it EXACTLY
+   - Don't "improve" it, don't "optimize" it - COPY IT EXACTLY
+   - Wrap in try-catch just like they do
+
+### Golden Rules for This Codebase
+
+1. **When Something Breaks**:
+   - DON'T rush to fix
+   - DO fetch the original HF file first
+   - DO compare line-by-line
+   - DO copy their exact implementation
+
+2. **When Adding Features**:
+   - Keep HF functionality intact
+   - Add your features alongside, not instead of
+   - Use feature flags or separate code paths if needed
+
+3. **Type Safety**:
+   - NEVER use `as any` to "fix" type errors
+   - If you see `as any`, it's probably hiding a bug
+   - Proper type conversions only (like CancellationToken → AbortSignal)
+
+4. **API Compatibility**:
+   - VS Code CancellationToken ≠ Web API AbortSignal
+   - VS Code expects specific class instances, not duck-typed objects
+   - When in doubt, check what HF does
+
+### Reference Implementations to Check
+
+When working on these areas, ALWAYS check HF original first:
+- `src/provider.ts` - Main provider implementation
+- Progress reporting in `readResponseStream` method
+- Model registration and naming patterns
+- Error handling and retry logic
+- Thinking support implementation
+
+### Documentation Requirements
+
+After ANY debugging session that takes >1 hour:
+1. Create analysis file in `analysis/YYYY-MM-DD/`
+2. Document what broke, why, and how it was fixed
+3. Update this section if new patterns discovered
+
+**Remember**: This extension must work with BOTH HuggingFace cloud models AND local vLLM/TGI models. Breaking HF compatibility to "fix" local models is NOT acceptable.
+
 ## CRITICAL: Development Workflow Principles
 
 **Parallel Task Execution:**
@@ -324,3 +475,61 @@ GITLAB_HOST=your-gitlab-instance.com glab issue list --assignee @me
 ```
 
 **Note:** The `.claude/GLAB.md` file contains comprehensive mappings from GitHub CLI to GitLab CLI, troubleshooting guides, and enterprise authentication patterns. Reference this file when working with GitLab repositories, issues, merge requests, and CI/CD pipelines.
+
+## Quick Debugging Reference (When Things Break)
+
+### STEP 1: Check Original HuggingFace Implementation
+```bash
+# Fetch the original file you're debugging
+curl -s https://raw.githubusercontent.com/huggingface/huggingface-vscode-chat/main/src/provider.ts > /tmp/hf-original-provider.ts
+
+# Compare with our version
+diff -u /tmp/hf-original-provider.ts src/provider.ts | head -100
+```
+
+### STEP 2: Common Bug Patterns to Check
+
+**"Failed to construct 'Request': member signal is not of type AbortSignal"**
+- Check line ~870-880 in provider.ts
+- Should NOT have `signal: token as any`
+- HF doesn't use signal parameter at all
+
+**"Sorry, no response was returned" (but logs show 200 OK)**
+- Check progress.report() calls
+- Must use: `new vscode.LanguageModelTextPart()`
+- NOT: `{ content: ... }` or `{ text: ... }`
+
+**Missing thinking/reasoning display**
+- Check lines ~580-610 in readResponseStream
+- Should have thinking support block from HF
+
+### STEP 3: Verification Commands
+```bash
+# 1. Always run tests first
+npm test
+
+# 2. Check compilation
+npm run compile
+
+# 3. Lint check
+npm run lint
+
+# 4. Build extension
+npm run package
+
+# 5. Check git history if unsure when bug introduced
+git log --oneline -20 src/provider.ts
+```
+
+### STEP 4: Emergency Recovery
+```bash
+# If you've broken everything, get back to known good state
+git stash
+git fetch origin
+git checkout origin/main -- src/provider.ts
+
+# Then carefully reapply your changes one by one
+```
+
+### Remember: When in Doubt, Check HuggingFace Original!
+The original implementation at https://github.com/huggingface/huggingface-vscode-chat works. If our fork doesn't work, we diverged incorrectly. Always ground fixes in their implementation.
