@@ -1,14 +1,14 @@
 {
-	"name": "huggingface-vscode-chat",
-	"publisher": "HuggingFace",
-	"displayName": "Hugging Face Provider for GitHub Copilot Chat",
-	"description": "An extension that integrates Hugging Face Inference Providers into GitHub Copilot Chat",
-	"icon": "assets/logo.png",
+	"name": "vllm-huggingface-bridge",
+	"publisher": "vllm-community",
+	"displayName": "vLLM + HuggingFace Provider for GitHub Copilot",
+	"description": "Access local vLLM/TGI servers and HuggingFace cloud models from GitHub Copilot Chat - perfect for air-gapped and hybrid deployments",
+	"icon": "assets/vllm-hf-logo.png",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/huggingface/huggingface-vscode-chat"
+		"url": "https://github.com/dzivkovi/vllm-huggingface-bridge"
 	},
-	"version": "0.0.6",
+	"version": "1.0.0",
 	"engines": {
 		"vscode": "^1.104.0"
 	},
@@ -20,28 +20,18 @@
 		"color": "#100f11",
 		"theme": "dark"
 	},
-	"badges": [
-		{
-			"url": "https://img.shields.io/github/stars/huggingface/huggingface-vscode-chat?style=social",
-			"description": "Star huggingface-vscode-chat on Github",
-			"href": "https://github.com/huggingface/huggingface-vscode-chat"
-		},
-		{
-			"url": "https://img.shields.io/twitter/follow/huggingface?style=social",
-			"description": "Follow Hugging Face on Twitter",
-			"href": "https://x.com/huggingface"
-		}
-	],
-	"homepage": "https://huggingface.co/docs/inference-providers/en/index",
+	"badges": [],
+	"keywords": ["vllm", "huggingface", "ai", "copilot", "local", "on-premise", "hybrid"],
+	"homepage": "https://github.com/dzivkovi/vllm-huggingface-bridge",
 	"bugs": {
-		"url": "https://github.com/huggingface/huggingface-vscode-chat/issues"
+		"url": "https://github.com/dzivkovi/vllm-huggingface-bridge/issues"
 	},
 	"license": "MIT",
 	"contributes": {
 		"languageModelChatProviders": [
 			{
-				"vendor": "huggingface",
-				"displayName": "Hugging Face",
+				"vendor": "vllm-bridge",
+				"displayName": "vLLM + HuggingFace",
 				"managementCommand": "huggingface.manage"
 			}
 		],
@@ -52,12 +42,12 @@
 			}
 		],
 		"configuration": {
-			"title": "Hugging Face Provider",
+			"title": "vLLM Bridge Settings",
 			"properties": {
-				"huggingface.customTGIEndpoint": {
+				"huggingface.localEndpoint": {
 					"type": "string",
 					"default": "http://hlo-codesentinel.wv.mentorg.com:8443",
-					"description": "Optional: Custom TGI/vLLM server endpoint. Default: http://hlo-codesentinel.wv.mentorg.com:8443 (Siemens team server). Clear this field to use only HuggingFace cloud models."
+					"description": "Local inference server endpoint (vLLM, TGI, TensorRT-LLM, etc.). Default: http://hlo-codesentinel.wv.mentorg.com:8443. Clear to disable local models."
 				},
 				"huggingface.tokenAllocation.inputRatio": {
 					"type": "number",
@@ -103,13 +93,15 @@
 		"download-api": "dts dev",
 		"postdownload-api": "dts main",
 		"postinstall": "npm run download-api",
+		"clean": "rm -rf out/ dist/ *.vsix .vscode-test/",
 		"compile": "tsc -p ./",
 		"lint": "eslint",
 		"format": "prettier --write .",
 		"watch": "tsc -watch -p ./",
 		"test": "npm run compile && vscode-test",
 		"package": "npm run compile && npx @vscode/vsce package",
-		"release": "npm run package && mkdir -p releases && cp huggingface-vscode-chat-*.vsix releases/ && cp releases/huggingface-vscode-chat-$(node -p \"require('./package.json').version\").vsix releases/huggingface-vscode-chat-latest.vsix"
+		"rebuild": "npm run clean && npm run compile && npm run package",
+		"release": "npm run package && mkdir -p releases && cp vllm-huggingface-bridge-*.vsix releases/ && cp releases/vllm-huggingface-bridge-$(node -p \"require('./package.json').version\").vsix releases/vllm-huggingface-bridge-latest.vsix"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.13.0",
@@ -122,8 +114,6 @@
 		"@vscode/test-cli": "^0.0.11",
 		"@vscode/test-electron": "^2.5.2",
 		"eslint": "^9.13.0",
-		"glob": "^11.0.3",
-		"mocha": "^11.7.2",
 		"prettier": "^3.1.0",
 		"typescript": "^5.9.2",
 		"typescript-eslint": "^8.39.0"

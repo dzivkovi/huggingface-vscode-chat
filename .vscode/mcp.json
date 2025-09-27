@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "codesentinel": {
+      "type": "http",
+      "url": "http://codesentinellv1.wv.mentorg.com:7010/mcp",
+      "headers": {
+        "X-API-Key": "sk-codebuddy-1"
+      }    }
+  }
+}

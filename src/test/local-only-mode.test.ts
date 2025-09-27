@@ -4,12 +4,16 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
 import { HuggingFaceChatModelProvider } from "../provider";
+import * as packageJson from "../../package.json";
 
 /**
  * Tests for local-only mode operation without HuggingFace API key requirement.
  * Issue #3: Support local inference without HuggingFace API key requirement
  */
 suite("Local-Only Mode Without HF Key", () => {
+	// Get default endpoint from package.json
+	const defaultLocalEndpoint = packageJson.contributes.configuration.properties["huggingface.localEndpoint"].default;
+	const localEndpointHost = new URL(defaultLocalEndpoint).host;
 
 	/**
 	 * Mock SecretStorage that simulates no API key stored
@@ -64,8 +68,8 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
-							return "http://localhost:8000";
+						if (key === "localEndpoint") {
+							return defaultLocalEndpoint;
 						}
 						return undefined;
 					}
@@ -76,7 +80,7 @@ suite("Local-Only Mode Without HF Key", () => {
 
 		// Mock fetch to simulate local server response
 		(global as any).fetch = async (url: string) => {
-			if (url.includes("localhost:8000")) {
+			if (url.includes(localEndpointHost)) {
 				if (url.endsWith("/v1/models")) {
 					return {
 						ok: true,
@@ -112,7 +116,7 @@ suite("Local-Only Mode Without HF Key", () => {
 		assert.ok(Array.isArray(infos), "Should return array of models");
 		assert.ok(infos.length > 0, "Should have at least one local model");
 		assert.ok(infos[0].id.startsWith("local|"), "Model ID should indicate local");
-		assert.ok(infos[0].name.includes("localhost"), "Model name should reference local server");
+		assert.ok(infos[0].name.includes(localEndpointHost.split(':')[0]), "Model name should reference local server");
 	});
 
 	test("Local-only mode: Should work even with silent:false (no prompts)", async () => {
@@ -121,8 +125,8 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
-							return "http://localhost:8000";
+						if (key === "localEndpoint") {
+							return defaultLocalEndpoint;
 						}
 						return undefined;
 					}
@@ -133,7 +137,7 @@ suite("Local-Only Mode Without HF Key", () => {
 
 		// Mock fetch for local server
 		(global as any).fetch = async (url: string) => {
-			if (url.includes("localhost:8000")) {
+			if (url.includes(localEndpointHost)) {
 				if (url.endsWith("/v1/models")) {
 					return {
 						ok: true,
@@ -186,7 +190,7 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
+						if (key === "localEndpoint") {
 							return undefined; // No local endpoint
 						}
 						return undefined;
@@ -215,7 +219,7 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
+						if (key === "localEndpoint") {
 							return undefined; // No local endpoint
 						}
 						return undefined;
@@ -267,8 +271,8 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
-							return "http://localhost:8000";
+						if (key === "localEndpoint") {
+							return defaultLocalEndpoint;
 						}
 						return undefined;
 					}
@@ -283,7 +287,8 @@ suite("Local-Only Mode Without HF Key", () => {
 
 		// Mock fetch
 		(global as any).fetch = async (url: string, options?: any) => {
-			if (url.includes("localhost:8000")) {
+			console.log("Test fetch called with URL:", url);
+			if (url.includes(localEndpointHost)) {
 				localEndpointCalled = true;
 				// Add health check mock
 				if (url.includes("/health")) {
@@ -316,8 +321,8 @@ suite("Local-Only Mode Without HF Key", () => {
 
 		// Create a local model info
 		const localModel: vscode.LanguageModelChatInformation = {
-			id: "local|http://localhost:8000|test-model",
-			name: "Test Model @ localhost",
+			id: `local|${defaultLocalEndpoint}|test-model`,
+			name: `Test Model @ ${localEndpointHost}`,
 			family: "huggingface",
 			version: "1.0.0",
 			maxInputTokens: 2048,
@@ -362,8 +367,8 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
-							return hasLocalEndpoint ? "http://localhost:8000" : undefined;
+						if (key === "localEndpoint") {
+							return hasLocalEndpoint ? defaultLocalEndpoint : undefined;
 						}
 						return undefined;
 					}
@@ -374,7 +379,7 @@ suite("Local-Only Mode Without HF Key", () => {
 
 		// Mock fetch
 		(global as any).fetch = async (url: string) => {
-			if (url.includes("localhost:8000") && hasLocalEndpoint) {
+			if (url.includes(localEndpointHost) && hasLocalEndpoint) {
 				if (url.endsWith("/v1/models")) {
 					return {
 						ok: true,
@@ -426,8 +431,8 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
-							return "http://localhost:8000";
+						if (key === "localEndpoint") {
+							return defaultLocalEndpoint;
 						}
 						return undefined;
 					}
@@ -439,7 +444,7 @@ suite("Local-Only Mode Without HF Key", () => {
 		// Mock fetch to return both local and HF models
 		global.fetch = async (url: string | URL | Request) => {
 			const urlStr = url.toString();
-			if (urlStr.includes("localhost:8000/v1/models")) {
+			if (urlStr.includes("${new URL(defaultLocalEndpoint).host}/v1/models")) {
 				return {
 					ok: true,
 					json: async () => ({
@@ -479,7 +484,7 @@ suite("Local-Only Mode Without HF Key", () => {
 
 		assert.ok(localModels.length > 0, "Should have local models");
 		assert.ok(cloudModels.length > 0, "Should have HF cloud models");
-		assert.ok(localModels[0].name.includes("localhost"), "Local model should reference localhost");
+		assert.ok(localModels[0].name.includes(localEndpointHost.split(':')[0]), "Local model should reference local server");
 		assert.ok(cloudModels.some((m: any) => m.id.includes("meta-llama")), "Should have HF model");
 	});
 
@@ -489,8 +494,8 @@ suite("Local-Only Mode Without HF Key", () => {
 			if (section === "huggingface") {
 				return {
 					get: (key: string) => {
-						if (key === "customTGIEndpoint") {
-							return "http://localhost:8000";
+						if (key === "localEndpoint") {
+							return defaultLocalEndpoint;
 						}
 						return undefined;
 					}
@@ -502,7 +507,7 @@ suite("Local-Only Mode Without HF Key", () => {
 		// Mock fetch to return local models but fail for HF
 		global.fetch = async (url: string | URL | Request) => {
 			const urlStr = url.toString();
-			if (urlStr.includes("localhost:8000/v1/models")) {
+			if (urlStr.includes("${new URL(defaultLocalEndpoint).host}/v1/models")) {
 				return {
 					ok: true,
 					json: async () => ({
@@ -535,7 +540,7 @@ suite("Local-Only Mode Without HF Key", () => {
 
 		const localModels = models.filter((m: any) => m.id.startsWith("local|"));
 		assert.ok(localModels.length > 0, "Should have local models");
-		assert.ok(localModels[0].name.includes("localhost"), "Local model should reference localhost");
+		assert.ok(localModels[0].name.includes(localEndpointHost.split(':')[0]), "Local model should reference local server");
 
 		// Should not have cloud models since fetch failed
 		const cloudModels = models.filter((m: any) => !m.id.startsWith("local|"));
