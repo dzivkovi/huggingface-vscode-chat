@@ -4,18 +4,16 @@ Download the latest pre-built extension without compilation:
 
 ## 📦 **Quick Download**
 
-### 🎉 New in v0.0.6 (2025-09-25)
+### 🎉 vLLM Bridge v1.0.0
+- **Unique Identity**: No more update prompts from marketplace
 - **Air-gapped support**: Works without HuggingFace API key
 - **Hybrid mode**: Use both local and cloud models simultaneously
 - **Error resilience**: Local models remain available when HF auth fails
-- **Team defaults**: Pre-configured for Siemens team server
-- **User notifications**: Warnings when endpoints are unreachable
 
 | Version | File | Download | Notes |
 |---------|------|----------|-------|
-| **Latest** | `huggingface-vscode-chat-latest.vsix` | [Download](./huggingface-vscode-chat-latest.vsix) | 🔥 v0.0.6 - Recommended |
-| **v0.0.6** | `huggingface-vscode-chat-0.0.6.vsix` | [Download](./huggingface-vscode-chat-0.0.6.vsix) | Local inference + Error resilience |
-| **v0.0.5** | `huggingface-vscode-chat-0.0.5.vsix` | [Download](./huggingface-vscode-chat-0.0.5.vsix) | Previous stable |
+| **Latest** | `vllm-huggingface-bridge-latest.vsix` | [Download](./vllm-huggingface-bridge-latest.vsix) | 🔥 v1.0.0 - Recommended |
+| **v1.0.0** | `vllm-huggingface-bridge-1.0.0.vsix` | [Download](./vllm-huggingface-bridge-1.0.0.vsix) | vLLM + HuggingFace Bridge |
 
 ## 🚀 **Installation (3 Steps)**
 
@@ -26,8 +24,11 @@ Download the latest pre-built extension without compilation:
 
 ### Method 2: Command Line
 ```bash
-# Download first, then:
-code --install-extension huggingface-vscode-chat-latest.vsix
+# Uninstall old extension if present
+code --uninstall-extension HuggingFace.huggingface-vscode-chat
+
+# Install new vLLM Bridge
+code --install-extension vllm-huggingface-bridge-latest.vsix
 ```
 
 ### Method 3: Extensions Panel
@@ -38,9 +39,10 @@ code --install-extension huggingface-vscode-chat-latest.vsix
 
 ## ✅ **Verify Installation**
 1. Restart VS Code
-2. Open GitHub Copilot Chat
-3. Click the model picker dropdown
-4. Look for "Hugging Face" provider option
+2. Check extensions: `code --list-extensions | grep vllm`
+3. Open GitHub Copilot Chat
+4. Click the model picker dropdown
+5. Look for "vLLM + HuggingFace" provider option
 
 ## 🆚 **Installation Options Comparison**
 

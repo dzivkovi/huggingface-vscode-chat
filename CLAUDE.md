@@ -50,7 +50,7 @@ This improves performance significantly and should be the default approach for i
 
 **⚠️ MANDATORY: ALL changes MUST follow strict TDD practices:**
 1. **Write tests FIRST** before implementing any feature or fix
-2. **Run `npm run test` BEFORE** declaring any task complete
+2. **Run `npm test` BEFORE** declaring any task complete
 3. **Never skip tests** - if tests don't exist, create them
 4. **Test coverage required** for:
    - Endpoint URL construction (especially local vs HF models)
@@ -61,22 +61,39 @@ This improves performance significantly and should be the default approach for i
 
 **TDD Workflow (MUST FOLLOW):**
 1. Write failing test for the bug/feature
-2. Run tests to confirm failure: `npm run test`
+2. Run tests to confirm failure: `npm test`
 3. Implement minimal code to pass test
-4. Run tests to confirm success: `npm run test`
+4. Run tests to confirm success: `npm test`
 5. Refactor if needed
-6. Run ALL tests before packaging: `npm run test`
-7. Only then: `npm run compile` and package
+6. Run ALL tests before packaging: `npm test`
+7. Check code quality: `npm run lint`
+8. Fix any linting issues: `npm run lint -- --fix`
+9. Type check: `npm run compile`
+10. Only then: `npm run package`
 
 ## Development Commands
 
 **Build and Development:**
-- `npm run test` - **RUN THIS FIRST AND OFTEN** - Run all unit tests
+- `npm test` - **RUN THIS FIRST AND OFTEN** - Run all Mocha unit tests
 - `npm install` - Install dependencies (automatically runs VS Code API download)
-- `npm run compile` - Compile TypeScript to JavaScript
+- `npm run compile` - Compile TypeScript to JavaScript (with type checking)
 - `npm run watch` - Compile with watch mode for development
 - `npm run lint` - Run ESLint for code quality checks
+- `npm run lint -- --fix` - Auto-fix ESLint issues
 - `npm run format` - Format code with Prettier
+
+**Python → TypeScript/Node Tool Equivalents:**
+
+| Python Tool | TypeScript/Node | Command | Purpose |
+|------------|----------------|---------|----------|
+| `pytest` | **Mocha** | `npm test` | Run unit tests |
+| `pytest -v` | Mocha verbose | `npm test -- --reporter spec` | Detailed test output |
+| `pytest file.py` | Test grep | `npm test -- --grep "pattern"` | Run specific tests |
+| `ruff` / `pylint` | **ESLint** | `npm run lint` | Code quality checks |
+| `black` / `ruff format` | **Prettier** | `npm run format` | Code formatting |
+| `mypy` | **TypeScript** | `npm run compile` | Type checking |
+| `pip install` | **npm** | `npm install` | Install dependencies |
+| `python -m build` | **vsce** | `npm run package` | Build distribution |
 
 **Extension Development:**
 - Press F5 in VS Code to launch Extension Development Host for testing
@@ -106,13 +123,13 @@ This is a VS Code extension that integrates Hugging Face Inference Providers wit
 
 **API Integration:**
 - Base URL: `https://router.huggingface.co/v1` (default cloud)
-- Local inference via `huggingface.customTGIEndpoint` setting
+- Local inference via `huggingface.localEndpoint` setting
 - Endpoints: `/models` (list models), `/chat/completions` (chat API)
 - Authentication: Bearer token for cloud, optional for local
 - User-Agent: Includes extension version and VS Code version for usage tracking
 
 **Local Inference Support (vLLM/TGI):**
-- Configuration: `"huggingface.customTGIEndpoint": "http://localhost:8000"`
+- Configuration: `"huggingface.localEndpoint": "http://localhost:8000"`
 - vLLM endpoint: `/v1/chat/completions` (OpenAI-compatible)
 - TGI endpoint: `/v1/chat/completions` (requires v2.0+)
 - Models appear with `tgi|` prefix in model picker
@@ -133,7 +150,8 @@ The extension supports two tool calling formats:
 - Default log level: INFO (DEBUG messages filtered for performance)
 - Output channel: "Hugging Face Chat Provider" in VS Code Output panel
 - Performance consideration: DEBUG logging can slow down token streaming
-- Change log level in logger.ts line 13: `LogLevel.INFO` vs `LogLevel.DEBUG`
+- PRODUCTION: Always use `LogLevel.INFO` in logger.ts line 13
+- DEBUGGING: Temporarily use `LogLevel.DEBUG` but revert before committing
 
 ## Testing and Package Management
 
@@ -141,6 +159,78 @@ The extension supports two tool calling formats:
 - TypeScript compilation target: ES2024, Node16 modules
 - Test framework: Mocha with VS Code test runner
 - No external runtime dependencies - only devDependencies for tooling
+
+## Defensive Programming in TypeScript
+
+**ALWAYS validate inputs and handle edge cases:**
+
+```typescript
+// Example: Defensive model validation
+function processModel(model: unknown): LanguageModelChatInformation {
+    // Type guards - never trust external data
+    if (!model || typeof model !== 'object') {
+        logger.error('Invalid model object received', model);
+        throw new Error('Invalid model object');
+    }
+
+    const safeModel = model as any;
+
+    // Defensive defaults and validation
+    const id = String(safeModel.id || 'default').substring(0, 100); // Limit length
+    const name = String(safeModel.name || 'Unknown Model').substring(0, 200);
+    const maxInputTokens = Math.min(Math.max(0, Number(safeModel.maxInputTokens) || 2048), 128000);
+
+    // Always return valid structure
+    return {
+        id,
+        name,
+        family: "vllm-bridge",
+        version: "1.0.0",
+        maxInputTokens,
+        maxOutputTokens: Math.min(maxInputTokens / 4, 4096),
+        capabilities: {
+            toolCalling: Boolean(safeModel.toolCalling),
+            imageInput: Boolean(safeModel.imageInput)
+        }
+    };
+}
+
+// Example: Safe async operations with timeouts
+async function fetchWithTimeout(url: string, timeout = 5000): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const response = await fetch(url, { signal: controller.signal });
+        return response;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            logger.error(`Request timeout after ${timeout}ms: ${url}`);
+            throw new Error(`Request timeout: ${url}`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+// Example: Never trust array indices
+function safeArrayAccess<T>(arr: T[], index: number, defaultValue: T): T {
+    if (!Array.isArray(arr) || index < 0 || index >= arr.length) {
+        return defaultValue;
+    }
+    return arr[index] ?? defaultValue;
+}
+```
+
+**Key Defensive Patterns:**
+1. **Always validate external inputs** - API responses, user configs, file contents
+2. **Use type guards** - Don't cast blindly with `as`
+3. **Set reasonable limits** - String lengths, array sizes, numeric ranges
+4. **Provide sensible defaults** - Never return undefined when a value is expected
+5. **Handle all error cases** - Network failures, timeouts, invalid data
+6. **Log errors with context** - Include relevant data for debugging
+7. **Test edge cases** - Empty arrays, null values, extreme numbers
 
 ## vLLM Development and Testing
 

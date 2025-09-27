@@ -1,4 +1,4 @@
-# Hugging Face & Local Inference Provider for GitHub Copilot Chat
+# vLLM + HuggingFace Bridge for GitHub Copilot
 
 ![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/inference-providers-guides/demo_vscode.gif)
 
@@ -7,12 +7,17 @@
 **Business users**: No compilation needed! Download and install immediately:
 
 ### Option 1: Pre-Built Extension (Recommended)
-1. **[📦 Download Latest VSIX](./releases/huggingface-vscode-chat-latest.vsix)**
+1. **[📦 Download Latest VSIX](./releases/vllm-huggingface-bridge-latest.vsix)**
 2. **Install**: Press `Ctrl+Shift+P` → Type `Extensions: Install from VSIX...` → Select downloaded file
 3. **Done!** Restart VS Code and access via GitHub Copilot Chat model picker
 
-### Option 2: VS Code Marketplace
-[🛍️ Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat) (public releases)
+### Option 2: Original Extension
+[🛍️ Install Original from Marketplace](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat)
+
+**Note**: If you have the original HuggingFace extension, uninstall it first:
+```bash
+code --uninstall-extension HuggingFace.huggingface-vscode-chat
+```
 
 [📋 **All Releases & Installation Guide**](./releases/README.md)
 
@@ -23,8 +28,6 @@
 This VS Code extension enables GitHub Copilot Chat to work with:
 - **Local inference servers** (vLLM/TGI) for secure, air-gapped environments
 - **Hugging Face Inference Providers** for cloud-based models (Kimi K2, DeepSeek V3.1, GLM 4.5, and more)
-- **Hybrid mode**: Use both local and cloud models simultaneously (v0.0.6+)
-- **Error resilient**: Local models remain available even if HF authentication fails (v0.0.6+)
 
 ---
 
@@ -33,16 +36,14 @@ This VS Code extension enables GitHub Copilot Chat to work with:
 For secure, on-premise environments where data cannot leave your network:
 
 1. Start your local vLLM or TGI server (see setup instructions below)
-2. Configure VS Code settings: `"huggingface.customTGIEndpoint": "http://your-server:8000"`
-   - Default for Siemens team: `http://hlo-codesentinel.wv.mentorg.com:8443`
+2. Configure VS Code settings: `"huggingface.localEndpoint": "http://your-server:8000"`
 3. Select your local model from the GitHub Copilot Chat model picker
 4. **No API keys required, all processing stays on your infrastructure**
-5. **New in v0.0.6**: Local models remain available even if HF cloud authentication fails
 
 ![Air-Gapped vLLM Inference](./assets/air-gapped-vLLM-inference.png)
 
 ## Cloud Deployment (Hugging Face)
-1. **Install the extension**: [📦 Download VSIX](./releases/huggingface-vscode-chat-latest.vsix) or [🛍️ Marketplace](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat)
+1. **Install the extension**: [📦 Download VSIX](./releases/vllm-huggingface-bridge-latest.vsix)
 2. Open VS Code's chat interface.
 3. Click the model picker and click "Manage Models...".
 4. Select "Hugging Face" provider.
@@ -78,7 +79,7 @@ docker run -d --name vllm-server \
 ```json
 // .vscode/settings.json
 {
-  "huggingface.customTGIEndpoint": "http://localhost:8000",
+  "huggingface.localEndpoint": "http://localhost:8000",
 
   // CRITICAL for small context models (2048 tokens):
   "github.copilot.chat.editor.temporalContext.enabled": false,
@@ -160,7 +161,7 @@ docker run -d --name vllm-server \
 
 #### VS Code Configuration:
 1. Open Settings (Ctrl+,)
-2. Search for "huggingface.customTGIEndpoint"
+2. Search for "huggingface.localEndpoint"
 3. Set value: `http://localhost:8000`
 4. Reload VS Code
 
@@ -183,7 +184,7 @@ curl http://localhost:8000/v1/models
 ⚠️ **Deprecated due to stability issues**:
 
 1. Open VS Code Settings (Ctrl+,)
-2. Search for "huggingface.customTGIEndpoint"
+2. Search for "huggingface.localEndpoint"
 3. Enter your TGI server URL (e.g., `http://192.168.1.100:8080`)
 4. See [TGI Setup Guide](docs/04-setup-tgi.md) for legacy support
 
