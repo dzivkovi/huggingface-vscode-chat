@@ -858,44 +858,55 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			headers["Authorization"] = `Bearer ${apiKey}`;
 		}
 
-		// Make the request
-		const response = await fetch(requestUrl, {
-			method: "POST",
-			headers,
-			body: JSON.stringify({
-				model: requestModel,
-				messages: openaiMessages,
-				...toolConfig,
-				max_tokens: maxTokens,
-				stream: true,
-			}),
-			signal: token as any, // CancellationToken to AbortSignal conversion
+		// Convert CancellationToken to AbortSignal
+		const abortController = new AbortController();
+		const tokenListener = token.onCancellationRequested(() => {
+			abortController.abort();
 		});
 
-		logger.debug(`Request sent to ${requestUrl}`);
+		// Make the request
+		try {
+			const response = await fetch(requestUrl, {
+				method: "POST",
+				headers,
+				body: JSON.stringify({
+					model: requestModel,
+					messages: openaiMessages,
+					...toolConfig,
+					max_tokens: maxTokens,
+					stream: true,
+				}),
+				signal: abortController.signal,
+			});
 
-		if (!response.ok) {
-			let errorText = "";
-			try {
-				errorText = await response.text();
-			} catch (error) {
-				logger.error("Failed to read error response text", error);
+			logger.debug(`Request sent to ${requestUrl}`);
+
+			if (!response.ok) {
+				let errorText = "";
+				try {
+					errorText = await response.text();
+				} catch (error) {
+					logger.error("Failed to read error response text", error);
+				}
+				const errorMessage = `${isLocalModel ? 'Local inference' : 'HF Router'} error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`;
+				logger.error(errorMessage);
+				throw new Error(errorMessage);
 			}
-			const errorMessage = `${isLocalModel ? 'Local inference' : 'HF Router'} error: ${response.status} ${response.statusText}${errorText ? `\n${errorText}` : ""}`;
-			logger.error(errorMessage);
-			throw new Error(errorMessage);
+
+			if (!response.body) {
+				throw new Error("Response body is empty");
+			}
+
+			logger.debug("Processing streaming response...");
+
+			// Process the streaming response
+			await this.readResponseStream(response.body, progress, token);
+
+			logger.debug("Streaming response completed");
+		} finally {
+			// Clean up the cancellation token listener
+			tokenListener.dispose();
 		}
-
-		if (!response.body) {
-			throw new Error("Response body is empty");
-		}
-
-		logger.debug("Processing streaming response...");
-
-		// Process the streaming response
-		await this.readResponseStream(response.body, progress, token);
-
-		logger.debug("Streaming response completed");
 
 		// Method returns void as per VS Code API
 	}
