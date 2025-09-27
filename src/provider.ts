@@ -581,8 +581,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					const delta = parsed.choices?.[0]?.delta;
 					if (delta?.content) {
 						// Process text chunks that might contain embedded tool calls
-						// Report the text content through the progress API
-						progress.report({ text: delta.content });
+						// Report the text content through the progress API (using VS Code API class)
+						progress.report(new vscode.LanguageModelTextPart(delta.content));
 						// Check for text-embedded tool calls (e.g. from Qwen)
 						this.checkForTextToolCalls(delta.content, progress);
 					}
@@ -631,10 +631,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (buffer.id && buffer.name && buffer.args) {
 				const parseResult = tryParseJSONObject(buffer.args);
 				if (parseResult.ok) {
-					// Report tool call through progress API
-					progress.report({
-						toolCall: { id: buffer.id, name: buffer.name, arguments: parseResult.value }
-					});
+					// Report tool call through progress API (using VS Code API class)
+					progress.report(new vscode.LanguageModelToolCallPart(buffer.id, buffer.name, parseResult.value));
 					// Clear the buffer after emission
 					this._toolCallBuffers.delete(index);
 				}
@@ -650,10 +648,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (buffer.id && buffer.name && buffer.args) {
 				const parseResult = tryParseJSONObject(buffer.args);
 				if (parseResult.ok) {
-					// Report tool call through progress API
-					progress.report({
-						toolCall: { id: buffer.id, name: buffer.name, arguments: parseResult.value }
-					});
+					// Report tool call through progress API (using VS Code API class)
+					progress.report(new vscode.LanguageModelToolCallPart(buffer.id, buffer.name, parseResult.value));
 				}
 			}
 		}
@@ -687,10 +683,8 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 					// Check if we've already emitted this tool call
 					const key = `${toolName}:${JSON.stringify(parseResult.value)}`;
 					if (!this._emittedTextToolCallKeys.has(key) && !this._emittedTextToolCallIds.has(toolId)) {
-						// Report tool call through progress API
-						progress.report({
-							toolCall: { id: toolId, name: toolName, arguments: parseResult.value }
-						});
+						// Report tool call through progress API (using VS Code API class)
+						progress.report(new vscode.LanguageModelToolCallPart(toolId, toolName, parseResult.value));
 						this._emittedTextToolCallKeys.add(key);
 						this._emittedTextToolCallIds.add(toolId);
 					}
@@ -707,10 +701,10 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 
 		for (const [key, tc] of this._textBasedToolCalls.toolCallsPendingCompletion.entries()) {
 			if (!this._emittedTextToolCallKeys.has(key) && !this._emittedTextToolCallIds.has(tc.id) && !tc.isThinking) {
-				// Report tool call through progress API
-				progress.report({
-					toolCall: { id: tc.id, name: tc.name, arguments: tc.input }
-				});
+				// Report tool call through progress API (using VS Code API class)
+				// tc.input is unknown, ensure it's an object for the API
+				const args = typeof tc.input === 'object' && tc.input !== null ? tc.input : {};
+				progress.report(new vscode.LanguageModelToolCallPart(tc.id, tc.name, args));
 				this._emittedTextToolCallKeys.add(key);
 				this._emittedTextToolCallIds.add(tc.id);
 			}
