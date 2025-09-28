@@ -4,12 +4,8 @@ import {
 	LanguageModelChatInformation,
 	LanguageModelChatProvider,
 	Progress,
-	type LanguageModelChatMessage,
-	type LanguageModelChatTool,
 	type LanguageModelChatRequestHandleOptions,
-	type LanguageModelResponsePart,
-	type LanguageModelTextPart,
-	type LanguageModelToolCallPart
+	type LanguageModelResponsePart
 } from "vscode";
 
 import { convertTools, convertMessages, tryParseJSONObject, validateRequest } from "./utils";
@@ -77,7 +73,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	// Optional vLLM/local inference endpoint from VS Code settings
 	private _localEndpoint: string | undefined;
 	// Cache for model context limits
-	private _modelContextLimits: Map<string, number> = new Map();
+	private _modelContextLimits = new Map<string, number>();
 
 	/**
 	 * Create a provider using the given secret storage for the API key.
@@ -675,7 +671,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 	 * Emit any pending tool calls that have complete data.
 	 */
 	private emitPendingToolCalls(progress: any): void {
-		for (const [index, buffer] of this._toolCallBuffers.entries()) {
+		for (const [_index, buffer] of this._toolCallBuffers.entries()) {
 			if (buffer.id && buffer.name && buffer.args) {
 				const parseResult = tryParseJSONObject(buffer.args);
 				if (parseResult.ok) {
@@ -800,7 +796,7 @@ export class HuggingFaceChatModelProvider implements LanguageModelChatProvider {
 			if (!apiKey) {
 				throw new Error("Hugging Face API key not found");
 			}
-			logger.debug(`Processing HF Router request`, { modelId: model.id });
+			logger.info(`Processing cloud model request for ${model.id}`);
 		}
 
 		const openaiMessages = convertMessages(messages);

@@ -33,3 +33,22 @@ node_modules/**/CHANGELOG*
 
 # Exclude test files
 src/test/**
+out/test/**
+out/**/*.test.js
+
+# Exclude large images not needed at runtime
+assets/air-gapped-vLLM-inference.png
+assets/huggingface-logo-original.png
+
+# Exclude development documentation
+CLAUDE.md
+
+# Exclude build and CI/CD files
+scripts/**
+.github/**
+
+# Exclude package manager files not needed
+pnpm-lock.yaml
+
+# Exclude releases folder to prevent recursive packaging
+releases/**

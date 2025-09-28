@@ -217,8 +217,8 @@ This improves performance significantly and should be the default approach for i
 4. Run tests to confirm success: `npm test`
 5. Refactor if needed
 6. Run ALL tests before packaging: `npm test`
-7. Check code quality: `npm run lint`
-8. Fix any linting issues: `npm run lint -- --fix`
+7. Auto-fix code style issues: `npm run lint` (auto-fixes like Ruff)
+8. Verify no remaining issues: `npm run lint:check`
 9. Type check: `npm run compile`
 10. Only then: `npm run package`
 
@@ -229,8 +229,9 @@ This improves performance significantly and should be the default approach for i
 - `npm install` - Install dependencies (automatically runs VS Code API download)
 - `npm run compile` - Compile TypeScript to JavaScript (with type checking)
 - `npm run watch` - Compile with watch mode for development
-- `npm run lint` - Run ESLint for code quality checks
-- `npm run lint -- --fix` - Auto-fix ESLint issues
+- `npm run lint` - **Auto-fixes issues** (like `ruff format`) - ESLint with auto-fix
+- `npm run lint:check` - Check only, no fixes (like `ruff check`)
+- `npm run lint:strict` - Treat warnings as errors (for CI/CD)
 - `npm run format` - Format code with Prettier
 
 **Python → TypeScript/Node Tool Equivalents:**
@@ -240,8 +241,10 @@ This improves performance significantly and should be the default approach for i
 | `pytest` | **Mocha** | `npm test` | Run unit tests |
 | `pytest -v` | Mocha verbose | `npm test -- --reporter spec` | Detailed test output |
 | `pytest file.py` | Test grep | `npm test -- --grep "pattern"` | Run specific tests |
-| `ruff` / `pylint` | **ESLint** | `npm run lint` | Code quality checks |
-| `black` / `ruff format` | **Prettier** | `npm run format` | Code formatting |
+| `ruff check` | **ESLint** | `npm run lint:check` | Check code quality |
+| `ruff format` / `ruff --fix` | **ESLint fix** | `npm run lint` | Auto-fix issues |
+| `ruff check --exit-non-zero-on-fix` | **ESLint strict** | `npm run lint:strict` | CI/CD mode |
+| `black` | **Prettier** | `npm run format` | Code formatting |
 | `mypy` | **TypeScript** | `npm run compile` | Type checking |
 | `pip install` | **npm** | `npm install` | Install dependencies |
 | `python -m build` | **vsce** | `npm run package` | Build distribution |
@@ -310,6 +313,29 @@ The extension supports two tool calling formats:
 - TypeScript compilation target: ES2024, Node16 modules
 - Test framework: Mocha with VS Code test runner
 - No external runtime dependencies - only devDependencies for tooling
+
+## ESLint Configuration Philosophy
+
+**Pragmatic Linting (Ruff-like Approach):**
+Our ESLint setup follows a pragmatic philosophy similar to Python's Ruff:
+
+1. **Auto-fix by default**: `npm run lint` auto-fixes issues (like `ruff format`)
+2. **Warnings over errors**: Most issues are warnings, not build-breaking errors
+3. **Smart equality checks**: `eqeqeq: ['warn', 'smart']` allows `== null` for null/undefined checks
+4. **Underscore convention**: Variables/params prefixed with `_` are ignored for unused checks
+5. **Real-world pragmatism**: Allows `any` type, `!` assertions, and other practical necessities
+
+**Key ESLint Rules:**
+- **Bug Prevention**: `no-undef`, `no-unreachable`, `no-constant-condition`
+- **Code Quality**: `no-unused-vars` (warn), `curly`, `semi`
+- **Allowed**: `console.log`, `require()`, `any` type, floating promises (VS Code specific)
+
+**Linting Commands:**
+```bash
+npm run lint          # Auto-fix issues (default, like ruff)
+npm run lint:check    # Check only, no fixes
+npm run lint:strict   # CI mode - warnings become errors
+```
 
 ## Defensive Programming in TypeScript
 
