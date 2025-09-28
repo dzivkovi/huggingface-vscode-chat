@@ -1,35 +1,45 @@
-# vLLM + HuggingFace Bridge for GitHub Copilot
+# vLLM HuggingFace Bridge for GitHub Copilot
 
-![Demo](https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/inference-providers-guides/demo_vscode.gif)
+[![Release](https://img.shields.io/github/v/release/dzivkovi/vllm-huggingface-bridge)](https://github.com/dzivkovi/vllm-huggingface-bridge/releases/latest)
+[![License](https://img.shields.io/github/license/dzivkovi/vllm-huggingface-bridge)](LICENSE.txt)
+[![VS Code](https://img.shields.io/badge/VS%20Code-1.104%2B-blue)](https://code.visualstudio.com/)
 
-## 🚀 Quick Install (30 seconds)
+**Bridge GitHub Copilot with local vLLM/TGI servers and HuggingFace cloud models**
 
-**Business users**: No compilation needed! Download and install immediately:
+## 🚀 Quick Install
 
-### Option 1: Pre-Built Extension (Recommended)
-1. **[📦 Download Latest VSIX](./releases/vllm-huggingface-bridge-latest.vsix)**
-2. **Install**: Press `Ctrl+Shift+P` → Type `Extensions: Install from VSIX...` → Select downloaded file
-3. **Done!** Restart VS Code and access via GitHub Copilot Chat model picker
+### Option 1: Download Latest Release (Recommended)
+1. **[⬇️ Download v1.0.0 VSIX](https://github.com/dzivkovi/vllm-huggingface-bridge/releases/download/v1.0.0/vllm-huggingface-bridge-1.0.0.vsix)** (92KB)
+2. **Install in VS Code**:
+   - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
+   - Type `Extensions: Install from VSIX...`
+   - Select the downloaded `.vsix` file
+3. **Restart VS Code** and select models in GitHub Copilot Chat
 
-### Option 2: Original Extension
-[🛍️ Install Original from Marketplace](https://marketplace.visualstudio.com/items?itemName=HuggingFace.huggingface-vscode-chat)
-
-**Note**: If you have the original HuggingFace extension, uninstall it first:
+### Option 2: Command Line Install
 ```bash
-code --uninstall-extension HuggingFace.huggingface-vscode-chat
+# Download and install in one command
+wget https://github.com/dzivkovi/vllm-huggingface-bridge/releases/download/v1.0.0/vllm-huggingface-bridge-1.0.0.vsix
+code --install-extension vllm-huggingface-bridge-1.0.0.vsix
 ```
 
-[📋 **All Releases & Installation Guide**](./releases/README.md)
+### Uninstall Previous Versions
+```bash
+# Remove original HuggingFace extension if installed
+code --uninstall-extension HuggingFace.huggingface-vscode-chat
 
----
+# Remove old vLLM Community version if installed
+code --uninstall-extension vllm-community.vllm-huggingface-bridge
+```
 
-**Air-Gapped Ready**: Run powerful LLMs locally with vLLM or TGI - no internet required for on-premise deployments.
+## ✨ Features
 
-This VS Code extension enables GitHub Copilot Chat to work with:
-- **Local inference servers** (vLLM/TGI) for secure, air-gapped environments
-- **Hugging Face Inference Providers** for cloud-based models (Kimi K2, DeepSeek V3.1, GLM 4.5, and more)
-
----
+- **🔒 Air-Gapped Ready**: Complete offline operation with local vLLM/TGI servers
+- **🚀 Dual Mode**: Seamlessly switch between local and cloud models
+- **⚡ Optimized**: 92KB package size (91% smaller than original)
+- **🛡️ Enterprise Ready**: Production-tested in secure environments
+- **🔧 Zero Config**: Works out-of-the-box with sensible defaults
+- **📊 Smart Token Management**: Automatic allocation for small context models
 
 ## Local Deployment (Air-Gapped Environments)
 
