@@ -21,7 +21,8 @@ tmp/
 work/
 
 # temporary conversation files
-analysis/**/2025-*/
+analysis/2025-*/
+analysis/*/2025-*/
 analysis/**/archive/
 
 # starter design docs (later moved to analysis/<issue#>/DESIGN.md)
