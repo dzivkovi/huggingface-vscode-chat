@@ -193,6 +193,31 @@ This improves performance significantly and should be the default approach for i
 - Only commit when user explicitly asks: "commit this", "git add", "create a commit", etc.
 - Default behavior: Make changes but DO NOT stage or commit them
 
+**Commit Message Conventions (Conventional Commits):**
+This repository follows Conventional Commits specification. Use these prefixes:
+- `feat:` - New feature for users (not a new feature for build script)
+- `fix:` - Bug fix for users (not a fix to build script)
+- `chore:` - Maintenance, cleanup, tooling, file removal (no production code change)
+- `docs:` - Documentation ONLY changes (no code changes)
+- `refactor:` - Code restructuring without changing external behavior
+- `test:` - Adding missing tests or correcting existing tests
+- `style:` - Code style changes (white-space, formatting, missing semi-colons, etc)
+- `perf:` - Performance improvements
+
+**Examples from this repository:**
+- `chore: remove analysis date folders from git and fix .gitignore`
+- `chore: streamline documentation and fix config property naming`
+- `docs: Update README for v1.0.0 release with proper installation instructions`
+- `fix: correct token calculation for vLLM models with template overhead`
+- `feat: Release v1.0.0 - Production-ready vLLM HuggingFace Bridge`
+
+**NEVER use `refactor:` for:**
+- Documentation changes (use `docs:` or `chore:`)
+- Configuration/property renaming (use `chore:` or `fix:`)
+- File cleanup/removal (use `chore:`)
+
+**Note:** Use `BREAKING CHANGE:` in commit body for changes that break backward compatibility
+
 **Content Guidelines:**
 - **NEVER use emojis in any files or documentation unless explicitly requested by the User**
 - Keep all content professional and emoji-free by default
