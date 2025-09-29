@@ -6,7 +6,7 @@
         "main"
     ],
     "files.trimTrailingWhitespace": true,
-    "huggingface.customTGIEndpoint": "http://localhost:8000",
+    "huggingface.localEndpoint": "http://localhost:8000",
 
     // Reduce GitHub Copilot Chat context to help with token limits
     // These are REAL settings from VS Code documentation:

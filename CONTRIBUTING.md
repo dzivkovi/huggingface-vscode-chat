@@ -76,7 +76,7 @@ docker run -d --name vllm-test --gpus all -p 8000:8000 \
 scripts/test-vllm.sh
 
 # Configure VS Code
-# Set: "huggingface.customTGIEndpoint": "http://localhost:8000"
+# Set: "huggingface.localEndpoint": "http://localhost:8000"
 ```
 
 ## 📝 Contribution Process
@@ -146,6 +146,24 @@ scripts/
 └── test-vllm.sh          # vLLM testing script
 ```
 
+## 📦 Development Commands
+
+```bash
+# Build & Test
+npm run compile      # Compile TypeScript
+npm run watch       # Auto-compile on changes
+npm test            # Run all tests
+npm run lint        # Auto-fix linting issues
+npm run lint:check  # Check linting without fixes
+
+# Package Extension
+npm run package     # Create .vsix file
+npm run release     # Build and copy to releases/
+
+# Quick Development Cycle
+scripts/rebuild-extension.sh  # Rebuild and reinstall
+```
+
 ## 💡 Tips for Success
 
 1. **Start small** - Fix a bug or improve docs first
@@ -165,7 +183,7 @@ scripts/
 
 - **Issues**: Open a GitHub issue with `[Question]` prefix
 - **Debugging**: Check logs in Output > "Hugging Face Chat Provider"
-- **Local Setup**: See [vLLM Setup Guide](docs/06-setup-vllm.md)
+- **Local Setup**: See [Local Setup Guide](docs/local-setup.md)
 
 ## 📜 Code of Conduct
 

@@ -59,7 +59,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
         echo ""
         echo "✅ vLLM server is ready!"
         echo "🌐 API endpoint: http://localhost:8000"
-        echo "📝 VS Code setting: huggingface.customTGIEndpoint = http://localhost:8000"
+        echo "📝 VS Code setting: huggingface.localEndpoint = http://localhost:8000"
         echo ""
         echo "Test with: curl http://localhost:8000/v1/models"
         exit 0

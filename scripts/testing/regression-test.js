@@ -69,10 +69,10 @@ if (packageJson.main === "./out/extension.js") {
 
 if (packageJson.contributes && packageJson.contributes.configuration) {
     const props = packageJson.contributes.configuration.properties;
-    if (props && props['huggingface.customTGIEndpoint']) {
-        console.log("✓ customTGIEndpoint configuration exists");
+    if (props && props['huggingface.localEndpoint']) {
+        console.log("✓ localEndpoint configuration exists");
     } else {
-        console.error("✗ customTGIEndpoint configuration missing");
+        console.error("✗ localEndpoint configuration missing");
     }
 }
 
