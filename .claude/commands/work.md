@@ -25,7 +25,7 @@ gh issue view $ARGUMENTS --comments
 git checkout -b <TYPE>/$ARGUMENTS-brief-description
 
 # Examples:
-# git checkout -b feat/19-python-formatting-cleanup
+# git checkout -b feat/19-vscode-extension-update
 # git checkout -b fix/23-database-connection-error
 # git checkout -b docs/15-api-documentation-update
 # git checkout -b chore/8-dependency-updates
@@ -50,17 +50,18 @@ git checkout -b <TYPE>/$ARGUMENTS-brief-description
 
 ### Step 5: CODE - Implement Minimal Solution
 - Follow existing code patterns and conventions
-- Use project libraries and tools (ruff for linting, pytest for testing)
+- Use project libraries and tools (ESLint for linting, Mocha for testing)
 - Implement only what's needed to pass the tests
 
 ### Step 6: VALIDATE - Run Quality Checks
 ```bash
 # Run tests multiple times (catch AI nondeterminism)
-pytest -v
+npm test
 
-# Code quality (120 char line length configured)
-ruff format .
-ruff check . --fix
+# Code quality and auto-fix issues
+npm run lint         # Auto-fix issues (like ruff format)
+npm run lint:check   # Check only, no fixes
+npm run compile      # Type checking
 ```
 
 ### Step 7: ORGANIZE - Move Design Document
@@ -129,6 +130,6 @@ The PR is created and should be added to the project.
 
 ## Project-Specific Notes
 
-- Line length: 120 characters (configured in pyproject.toml)
+- Line length: 120 characters (configured in ESLint config)
 - Testing: Focus on evaluation tests that verify business requirements
 - Performance: Query responses should be <1s for evaluation criteria

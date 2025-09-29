@@ -34,9 +34,9 @@ fi
 
 # 3. Test status
 echo -e "\n=== Test Status ==="
-if pytest -v --last-failed --tb=no 2>/dev/null | grep -q "failed"; then
+if npm test 2>&1 | grep -q "failing\|error"; then
   echo "❌ Some tests are failing - need to fix"
-  pytest -v --last-failed --tb=short
+  npm test -- --reporter spec
 else
   echo "✓ All tests passing"
 fi
